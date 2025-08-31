@@ -1,6 +1,7 @@
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Search, Settings } from "lucide-react";
+import { NotificationDropdown } from "./NotificationDropdown";
+import { SearchDialog } from "./SearchDialog";
+import { SettingsDropdown } from "./SettingsDropdown";
 
 const Topbar = () => {
   return (
@@ -12,17 +13,15 @@ const Topbar = () => {
         </Badge>
       </div>
 
-      <div className="flex items-center space-x-4">
-        <Button variant="ghost" size="sm" className="relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute -top-1 -right-1 h-2 w-2 bg-destructive rounded-full"></span>
-        </Button>
-        <Button variant="ghost" size="sm">
-          <Search className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm">
-          <Settings className="h-4 w-4" />
-        </Button>
+      <div className="flex items-center space-x-2">
+        <NotificationDropdown />
+        <SearchDialog />
+        <div className="hidden md:flex items-center space-x-1 text-xs text-muted-foreground">
+          <kbd className="px-2 py-1 bg-muted rounded text-xs">Ctrl</kbd>
+          <span>+</span>
+          <kbd className="px-2 py-1 bg-muted rounded text-xs">K</kbd>
+        </div>
+        <SettingsDropdown />
       </div>
     </header>
   );
