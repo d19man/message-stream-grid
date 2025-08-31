@@ -45,6 +45,25 @@ export const SettingsDropdown = () => {
 
   const handleThemeChange = (theme: "light" | "dark" | "system") => {
     setDarkMode(theme === "dark");
+    
+    // Apply theme to document
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else if (theme === "light") {
+      document.documentElement.classList.remove("dark");
+    } else {
+      // System theme
+      const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (systemDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+    
+    // Save theme preference
+    localStorage.setItem("theme", theme);
+    
     toast({
       title: "Theme Updated",
       description: `Switched to ${theme} theme`,
@@ -52,26 +71,77 @@ export const SettingsDropdown = () => {
   };
 
   const handleLogout = () => {
+    // Clear any stored auth data
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("user");
+    
     toast({
       title: "Logged Out",
       description: "You have been successfully logged out",
     });
-    // In real app, this would clear auth tokens and redirect
-    console.log("Logout functionality");
+    
+    // Redirect to login or home page
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 1000);
   };
 
   const handleExportData = () => {
+    const data = {
+      settings: { darkMode, notifications, sounds, autoConnect },
+      exportDate: new Date().toISOString(),
+      version: "1.0.0"
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `whatsapp-suite-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
     toast({
-      title: "Export Started",
-      description: "Your data export will be ready shortly",
+      title: "Export Complete",
+      description: "Your data has been downloaded",
     });
   };
 
   const handleImportData = () => {
-    toast({
-      title: "Import Ready",
-      description: "Please select a file to import",
-    });
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target?.result as string);
+            if (data.settings) {
+              setDarkMode(data.settings.darkMode || false);
+              setNotifications(data.settings.notifications || true);
+              setSounds(data.settings.sounds || true);
+              setAutoConnect(data.settings.autoConnect || true);
+            }
+            toast({
+              title: "Import Successful",
+              description: "Your settings have been imported",
+            });
+          } catch (error) {
+            toast({
+              title: "Import Failed",
+              description: "Invalid file format",
+              variant: "destructive",
+            });
+          }
+        };
+        reader.readAsText(file);
+      }
+    };
+    input.click();
   };
 
   return (
