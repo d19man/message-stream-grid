@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Send, Users, Clock, Settings } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Send, Users, Clock, Settings, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { BroadcastJob, PoolType, Template, Contact, Session } from "@/types";
+import { PREDEFINED_TAGS } from "../contacts/ImportContactDialog";
 
 interface CampaignDialogProps {
   trigger?: React.ReactNode;
@@ -25,6 +27,7 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
     targetContacts: [] as string[],
     manualPhones: [] as string[],
     manualPhoneText: "",
+    selectedTags: [] as string[],
     delayMin: 30,
     delayMax: 120,
     sessions: [] as string[],
@@ -141,6 +144,7 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
       targetContacts: [],
       manualPhones: [],
       manualPhoneText: "",
+      selectedTags: [],
       delayMin: 30,
       delayMax: 120,
       sessions: [],
@@ -187,6 +191,25 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
       sessions: prev.sessions.includes(sessionId)
         ? prev.sessions.filter(id => id !== sessionId)
         : [...prev.sessions, sessionId]
+    }));
+  };
+
+  // Get contacts filtered by selected tags
+  const getFilteredContacts = () => {
+    if (formData.selectedTags.length === 0) {
+      return contacts;
+    }
+    return contacts.filter(contact => 
+      formData.selectedTags.some(tag => contact.tags.includes(tag))
+    );
+  };
+
+  const handleTagToggle = (tag: string) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedTags: prev.selectedTags.includes(tag)
+        ? prev.selectedTags.filter(t => t !== tag)
+        : [...prev.selectedTags, tag]
     }));
   };
 
@@ -288,6 +311,9 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
       case 3:
         const totalContacts = formData.targetContacts.length + formData.manualPhones.length;
         const validManualPhones = validatePhoneNumbers(formData.manualPhones);
+        const filteredContacts = getFilteredContacts();
+        // Get all unique tags from contacts
+        const allTags = Array.from(new Set(contacts.flatMap(contact => contact.tags)));
         
         return (
           <div className="space-y-6">
@@ -299,6 +325,71 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
                   Total: {totalContacts} contacts selected
                 </span>
               </div>
+            </div>
+
+            {/* Tag Filter Section */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Tag className="h-4 w-4" />
+                <span className="font-medium">Filter by Tags</span>
+                {formData.selectedTags.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    ({formData.selectedTags.length} tag(s) selected)
+                  </span>
+                )}
+              </div>
+              
+              {/* Predefined Tags */}
+              <div>
+                <Label className="text-xs text-muted-foreground mb-2">Quick Filter Tags</Label>
+                <div className="flex flex-wrap gap-1">
+                  {PREDEFINED_TAGS.slice(0, 6).map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant={formData.selectedTags.includes(tag) ? "default" : "outline"}
+                      className="cursor-pointer text-xs"
+                      onClick={() => handleTagToggle(tag)}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Available Tags from Contacts */}
+              {allTags.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2">All Available Tags</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {allTags.map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant={formData.selectedTags.includes(tag) ? "default" : "secondary"}
+                        className="cursor-pointer text-xs"
+                        onClick={() => handleTagToggle(tag)}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {formData.selectedTags.length > 0 && (
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-muted-foreground">
+                    Showing {filteredContacts.length} of {contacts.length} contacts
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFormData(prev => ({ ...prev, selectedTags: [] }))}
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Manual Phone Numbers Section */}
@@ -348,30 +439,37 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
 
             {/* Contact List Section */}
             <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <span className="font-medium">Saved Contacts</span>
-                <span className="text-xs text-muted-foreground">
-                  ({formData.targetContacts.length} selected)
-                </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="font-medium">Saved Contacts</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({formData.targetContacts.length} selected from {filteredContacts.length} shown)
+                  </span>
+                </div>
               </div>
               <div className="border rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
                 <div className="flex items-center space-x-2 pb-2 border-b">
                   <Checkbox
                     id="select-all"
-                    checked={formData.targetContacts.length === contacts.length}
+                    checked={filteredContacts.length > 0 && filteredContacts.every(c => formData.targetContacts.includes(c.id))}
                     onCheckedChange={(checked) => {
                       if (checked) {
-                        setFormData(prev => ({ ...prev, targetContacts: contacts.map(c => c.id) }));
+                        const newSelected = [...new Set([...formData.targetContacts, ...filteredContacts.map(c => c.id)])];
+                        setFormData(prev => ({ ...prev, targetContacts: newSelected }));
                       } else {
-                        setFormData(prev => ({ ...prev, targetContacts: [] }));
+                        const filteredIds = filteredContacts.map(c => c.id);
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          targetContacts: prev.targetContacts.filter(id => !filteredIds.includes(id))
+                        }));
                       }
                     }}
                   />
                   <Label htmlFor="select-all" className="font-medium cursor-pointer">
-                    Select All Contacts
+                    Select All {formData.selectedTags.length > 0 ? 'Filtered' : ''} Contacts
                   </Label>
                 </div>
-                {contacts.map((contact) => (
+                {filteredContacts.map((contact) => (
                   <div key={contact.id} className="flex items-center space-x-2">
                     <Checkbox
                       id={contact.id}
@@ -380,12 +478,28 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
                     />
                     <Label htmlFor={contact.id} className="flex-1 cursor-pointer">
                       <div className="flex items-center justify-between">
-                        <span>{contact.name || "Unknown"}</span>
+                        <div>
+                          <span>{contact.name || "Unknown"}</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {contact.tags.map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
                         <span className="text-xs text-muted-foreground">{contact.phone}</span>
                       </div>
                     </Label>
                   </div>
                 ))}
+                {filteredContacts.length === 0 && formData.selectedTags.length > 0 && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <Tag className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No contacts found with selected tags</p>
+                    <p className="text-xs">Try different tags or clear filters</p>
+                  </div>
+                )}
                 {contacts.length === 0 && (
                   <div className="text-center py-4 text-muted-foreground">
                     <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />

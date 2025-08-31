@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Edit, X, Phone, User, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Contact } from "@/types";
+import { PREDEFINED_TAGS } from "./ImportContactDialog";
 
 interface ContactDialogProps {
   contact?: Contact;
@@ -61,13 +63,16 @@ export const ContactDialog = ({ contact, trigger, onSave }: ContactDialogProps) 
     }
   };
 
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
+  const addTag = (tagToAdd?: string) => {
+    const tag = tagToAdd || newTag.trim();
+    if (tag && !formData.tags.includes(tag)) {
       setFormData(prev => ({
         ...prev,
-        tags: [...prev.tags, newTag.trim()]
+        tags: [...prev.tags, tag]
       }));
-      setNewTag("");
+      if (!tagToAdd) {
+        setNewTag("");
+      }
     }
   };
 
@@ -141,7 +146,7 @@ export const ContactDialog = ({ contact, trigger, onSave }: ContactDialogProps) 
             </Label>
             
             {/* Current Tags */}
-            <div className="flex flex-wrap gap-1 mb-2">
+            <div className="flex flex-wrap gap-1 mb-3">
               {formData.tags.map((tag) => (
                 <Badge key={tag} variant="secondary" className="text-xs">
                   {tag}
@@ -156,16 +161,41 @@ export const ContactDialog = ({ contact, trigger, onSave }: ContactDialogProps) 
               ))}
             </div>
 
-            {/* Add New Tag */}
+            {/* Quick Select Predefined Tags */}
+            <div className="mb-3">
+              <Label className="text-xs text-muted-foreground">Quick Select Tags</Label>
+              <div className="grid grid-cols-2 gap-1 mt-1">
+                {PREDEFINED_TAGS.slice(0, 6).map((tag) => (
+                  <div key={tag} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`preset-${tag}`}
+                      checked={formData.tags.includes(tag)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          addTag(tag);
+                        } else {
+                          removeTag(tag);
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`preset-${tag}`} className="text-xs cursor-pointer">
+                      {tag}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Add Custom Tag */}
             <div className="flex space-x-2">
               <Input
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyPress={handleTagKeyPress}
-                placeholder="Add tag and press Enter"
+                placeholder="Add custom tag and press Enter"
                 className="flex-1"
               />
-              <Button type="button" variant="outline" size="sm" onClick={addTag}>
+              <Button type="button" variant="outline" size="sm" onClick={() => addTag()}>
                 Add
               </Button>
             </div>

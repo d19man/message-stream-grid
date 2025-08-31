@@ -19,6 +19,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { ContactDialog } from "@/components/contacts/ContactDialog";
+import { ImportContactDialog } from "@/components/contacts/ImportContactDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Contact } from "@/types";
 
@@ -109,6 +110,25 @@ const Contacts = () => {
     }
   };
 
+  const handleImportContacts = (importedContacts: Partial<Contact>[]) => {
+    const newContacts: Contact[] = importedContacts.map((contactData, index) => ({
+      id: (Date.now() + index).toString(),
+      name: contactData.name || "",
+      phone: contactData.phone!,
+      tags: contactData.tags || [],
+      optOut: contactData.optOut || false,
+      userId: "user1",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+    
+    setContacts(prev => [...prev, ...newContacts]);
+    toast({
+      title: "Success",
+      description: `Imported ${newContacts.length} contacts successfully!`,
+    });
+  };
+
   const handleDeleteContact = (id: string) => {
     if (confirm("Are you sure you want to delete this contact?")) {
       setContacts(prev => prev.filter(c => c.id !== id));
@@ -152,10 +172,7 @@ const Contacts = () => {
           <p className="text-muted-foreground">Manage your contact database</p>
         </div>
         <div className="flex items-center space-x-4">
-          <Button variant="outline" className="flex items-center space-x-2">
-            <Upload className="h-4 w-4" />
-            <span>Import</span>
-          </Button>
+          <ImportContactDialog onImport={handleImportContacts} />
           <Button variant="outline" className="flex items-center space-x-2">
             <Download className="h-4 w-4" />
             <span>Export</span>
