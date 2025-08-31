@@ -17,6 +17,7 @@ interface SearchResult {
 export const SearchDialog = () => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Keyboard shortcut Ctrl+K
   useEffect(() => {
@@ -30,6 +31,11 @@ export const SearchDialog = () => {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Reset selected index when query changes
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
 
   // Mock search results
   const allResults: SearchResult[] = [
@@ -129,7 +135,50 @@ export const SearchDialog = () => {
     window.location.href = result.action;
     setOpen(false);
     setQuery("");
+    setSelectedIndex(0);
   };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!open) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setSelectedIndex(prev => 
+          prev < filteredResults.length - 1 ? prev + 1 : 0
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setSelectedIndex(prev => 
+          prev > 0 ? prev - 1 : filteredResults.length - 1
+        );
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (filteredResults[selectedIndex]) {
+          handleResultClick(filteredResults[selectedIndex]);
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        setOpen(false);
+        setQuery("");
+        setSelectedIndex(0);
+        break;
+    }
+  };
+
+  // Scroll selected item into view
+  useEffect(() => {
+    const selectedElement = document.getElementById(`search-result-${selectedIndex}`);
+    if (selectedElement) {
+      selectedElement.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }
+  }, [selectedIndex]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -138,7 +187,7 @@ export const SearchDialog = () => {
           <Search className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" onKeyDown={handleKeyDown}>
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Search className="h-5 w-5" />
@@ -155,17 +204,22 @@ export const SearchDialog = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-10"
+              onKeyDown={handleKeyDown}
               autoFocus
             />
           </div>
 
-          {/* Keyboard Shortcut Hint */}
+          {/* Keyboard Shortcut Hints */}
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Pro tip: Use Ctrl+K to open search quickly</span>
             <div className="flex items-center space-x-1">
               <kbd className="px-2 py-1 bg-muted rounded text-xs">↑</kbd>
               <kbd className="px-2 py-1 bg-muted rounded text-xs">↓</kbd>
-              <span>to navigate</span>
+              <span>navigate</span>
+              <kbd className="px-2 py-1 bg-muted rounded text-xs ml-2">Enter</kbd>
+              <span>select</span>
+              <kbd className="px-2 py-1 bg-muted rounded text-xs ml-2">Esc</kbd>
+              <span>close</span>
             </div>
           </div>
 
@@ -176,16 +230,26 @@ export const SearchDialog = () => {
                 {query ? "No results found" : "Start typing to search..."}
               </div>
             ) : (
-              filteredResults.map((result) => (
+              filteredResults.map((result, index) => (
                 <div
                   key={result.id}
-                  className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                  id={`search-result-${index}`}
+                  className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                    index === selectedIndex 
+                      ? 'bg-accent border-2 border-primary' 
+                      : 'hover:bg-accent/50'
+                  }`}
                   onClick={() => handleResultClick(result)}
+                  onMouseEnter={() => setSelectedIndex(index)}
                 >
                   {getResultIcon(result.type)}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm">{result.title}</p>
+                      <p className={`font-medium text-sm ${
+                        index === selectedIndex ? 'text-primary' : ''
+                      }`}>
+                        {result.title}
+                      </p>
                       {result.badge && (
                         <Badge className={`text-xs ${getBadgeColor(result.badge)}`}>
                           {result.badge}
@@ -196,7 +260,14 @@ export const SearchDialog = () => {
                       {result.description}
                     </p>
                   </div>
-                  <Command className="h-3 w-3 text-muted-foreground" />
+                  <div className="flex items-center space-x-1">
+                    {index === selectedIndex && (
+                      <kbd className="px-2 py-1 bg-primary text-primary-foreground rounded text-xs">
+                        Enter
+                      </kbd>
+                    )}
+                    <Command className="h-3 w-3 text-muted-foreground" />
+                  </div>
                 </div>
               ))
             )}
