@@ -98,14 +98,14 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
       ...prev,
       contentJson: {
         ...prev.contentJson,
-        buttons: [...buttons, { id: Date.now().toString(), text: "" }]
+        buttons: [...buttons, { id: Date.now().toString(), text: "", url: "" }]
       }
     }));
   };
 
-  const updateButton = (index: number, text: string) => {
+  const updateButton = (index: number, field: 'text' | 'url', value: string) => {
     const buttons = [...(formData.contentJson.buttons || [])];
-    buttons[index] = { ...buttons[index], text };
+    buttons[index] = { ...buttons[index], [field]: value };
     setFormData(prev => ({
       ...prev,
       contentJson: { ...prev.contentJson, buttons }
@@ -331,22 +331,39 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                 
                 <div className="space-y-2">
                   {(formData.contentJson.buttons || []).map((button: any, index: number) => (
-                    <div key={button.id} className="flex items-center space-x-2">
-                      <Input
-                        value={button.text}
-                        onChange={(e) => updateButton(index, e.target.value)}
-                        placeholder={`Interactive button name (e.g., "DAFTAR SEKARANG", "HUBUNGI KAMI")`}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeButton(index)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        Remove
-                      </Button>
+                    <div key={button.id} className="space-y-2 p-3 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Button {index + 1}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeButton(index)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs">Button Name</Label>
+                          <Input
+                            value={button.text || ""}
+                            onChange={(e) => updateButton(index, 'text', e.target.value)}
+                            placeholder="e.g., DAFTAR SEKARANG"
+                            className="text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Link URL</Label>
+                          <Input
+                            value={button.url || ""}
+                            onChange={(e) => updateButton(index, 'url', e.target.value)}
+                            placeholder="https://example.com/register"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -400,22 +417,39 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                 
                 <div className="space-y-2">
                   {(formData.contentJson.buttons || []).map((button: any, index: number) => (
-                    <div key={button.id} className="flex items-center space-x-2">
-                      <Input
-                        value={button.text}
-                        onChange={(e) => updateButton(index, e.target.value)}
-                        placeholder={`Interactive button name (e.g., "DAFTAR SEKARANG", "HUBUNGI KAMI")`}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeButton(index)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        Remove
-                      </Button>
+                    <div key={button.id} className="space-y-2 p-3 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Button {index + 1}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeButton(index)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs">Button Name</Label>
+                          <Input
+                            value={button.text || ""}
+                            onChange={(e) => updateButton(index, 'text', e.target.value)}
+                            placeholder="e.g., DAFTAR SEKARANG"
+                            className="text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Link URL</Label>
+                          <Input
+                            value={button.url || ""}
+                            onChange={(e) => updateButton(index, 'url', e.target.value)}
+                            placeholder="https://example.com/register"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
