@@ -17,11 +17,15 @@ import {
   AlertCircle,
   XCircle,
 } from "lucide-react";
+import { CampaignDialog } from "@/components/broadcast/CampaignDialog";
+import { useToast } from "@/hooks/use-toast";
 import type { BroadcastJob, BroadcastStatus } from "@/types";
 
 const Broadcast = () => {
+  const { toast } = useToast();
+  
   // Mock data
-  const jobs: BroadcastJob[] = [
+  const initialJobs: BroadcastJob[] = [
     {
       id: "1",
       name: "Summer Sale Campaign",
@@ -103,6 +107,60 @@ const Broadcast = () => {
     },
   ];
 
+  const [jobs, setJobs] = useState<BroadcastJob[]>(initialJobs);
+
+  const handleSaveCampaign = (campaignData: Partial<BroadcastJob>) => {
+    const newCampaign: BroadcastJob = {
+      id: Date.now().toString(),
+      name: campaignData.name!,
+      pool: campaignData.pool!,
+      templateId: campaignData.templateId!,
+      targetContacts: campaignData.targetContacts!,
+      status: campaignData.status!,
+      planJson: campaignData.planJson!,
+      stats: campaignData.stats!,
+      userId: "user1",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setJobs(prev => [...prev, newCampaign]);
+  };
+
+  const handleCampaignAction = (jobId: string, action: string) => {
+    setJobs(prev => prev.map(job => {
+      if (job.id === jobId) {
+        let newStatus = job.status;
+        switch (action) {
+          case "pause":
+            newStatus = "paused";
+            break;
+          case "resume":
+            newStatus = "running";
+            break;
+          case "retry":
+            newStatus = "queued";
+            break;
+          case "start":
+            newStatus = "running";
+            break;
+        }
+        
+        toast({
+          title: "Success",
+          description: `Campaign ${action}ed successfully!`,
+        });
+
+        return {
+          ...job,
+          status: newStatus as BroadcastStatus,
+          updatedAt: new Date().toISOString(),
+          ...(action === "start" && { startedAt: new Date().toISOString() })
+        };
+      }
+      return job;
+    }));
+  };
+
   const getStatusIcon = (status: BroadcastStatus) => {
     switch (status) {
       case "running":
@@ -160,10 +218,7 @@ const Broadcast = () => {
           <h1 className="text-3xl font-bold text-foreground">Broadcast</h1>
           <p className="text-muted-foreground">Manage your broadcast campaigns</p>
         </div>
-        <Button className="bg-gradient-primary hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" />
-          New Campaign
-        </Button>
+        <CampaignDialog onSave={handleSaveCampaign} />
       </div>
 
       {/* Stats Cards */}
@@ -241,20 +296,42 @@ const Broadcast = () => {
                 </div>
                 
                 <div className="flex items-center space-x-2">
+                  {job.status === "draft" && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleCampaignAction(job.id, "start")}
+                    >
+                      <Play className="h-3 w-3 mr-1" />
+                      Start
+                    </Button>
+                  )}
                   {job.status === "running" && (
-                    <Button size="sm" variant="outline">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleCampaignAction(job.id, "pause")}
+                    >
                       <Pause className="h-3 w-3 mr-1" />
                       Pause
                     </Button>
                   )}
                   {job.status === "paused" && (
-                    <Button size="sm" variant="outline">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleCampaignAction(job.id, "resume")}
+                    >
                       <Play className="h-3 w-3 mr-1" />
                       Resume
                     </Button>
                   )}
                   {job.status === "failed" && (
-                    <Button size="sm" variant="outline">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleCampaignAction(job.id, "retry")}
+                    >
                       <RotateCcw className="h-3 w-3 mr-1" />
                       Retry
                     </Button>
