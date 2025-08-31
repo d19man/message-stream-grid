@@ -191,10 +191,7 @@ const Broadcast = () => {
             break;
         }
         
-        toast({
-          title: "Success",
-          description: `Campaign ${action}ed successfully!`,
-        });
+        // Move toast to after state update to avoid setState during render
 
         return {
           ...job,
@@ -205,6 +202,12 @@ const Broadcast = () => {
       }
       return job;
     }));
+
+    // Toast after state update
+    toast({
+      title: "Success",
+      description: `Campaign ${action}ed successfully!`,
+    });
   };
 
   const getStatusIcon = (status: BroadcastStatus) => {

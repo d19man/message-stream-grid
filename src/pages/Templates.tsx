@@ -22,7 +22,7 @@ const Templates = () => {
   const [activeTab, setActiveTab] = useState<TemplateKind>("text");
 
   // Mock data - replace with API call
-  const mockTemplates: Template[] = [
+  const getMockTemplates = (): Template[] => [
     {
       id: "1",
       name: "Welcome Message",
@@ -84,7 +84,7 @@ const Templates = () => {
     },
   ];
 
-  const [templates, setTemplates] = useState<Template[]>(mockTemplates);
+  const [templates, setTemplates] = useState<Template[]>(getMockTemplates());
 
   const handleSaveTemplate = (templateData: Partial<Template>) => {
     if (templateData.id) {
