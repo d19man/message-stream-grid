@@ -23,6 +23,8 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
     pool: "" as PoolType | "",
     templateId: "",
     targetContacts: [] as string[],
+    manualPhones: [] as string[],
+    manualPhoneText: "",
     delayMin: 30,
     delayMax: 120,
     sessions: [] as string[],
@@ -79,10 +81,10 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
       return;
     }
 
-    if (formData.targetContacts.length === 0) {
+    if (formData.targetContacts.length === 0 && formData.manualPhones.length === 0) {
       toast({
         title: "Error",
-        description: "Please select at least one contact",
+        description: "Please select at least one contact or add phone numbers manually",
         variant: "destructive",
       });
       return;
@@ -97,11 +99,13 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
       return;
     }
 
+    const allTargetContacts = [...formData.targetContacts, ...formData.manualPhones];
+    
     const campaignData: Partial<BroadcastJob> = {
       name: formData.name,
       pool: formData.pool,
       templateId: formData.templateId,
-      targetContacts: formData.targetContacts,
+      targetContacts: allTargetContacts,
       status: "draft",
       planJson: {
         delayMin: formData.delayMin,
@@ -114,10 +118,10 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
         },
       },
       stats: {
-        total: formData.targetContacts.length,
+        total: allTargetContacts.length,
         sent: 0,
         failed: 0,
-        pending: formData.targetContacts.length,
+        pending: allTargetContacts.length,
       },
     };
 
@@ -135,6 +139,8 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
       pool: "" as PoolType | "",
       templateId: "",
       targetContacts: [],
+      manualPhones: [],
+      manualPhoneText: "",
       delayMin: 30,
       delayMax: 120,
       sessions: [],
@@ -151,6 +157,28 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
         ? prev.targetContacts.filter(id => id !== contactId)
         : [...prev.targetContacts, contactId]
     }));
+  };
+
+  const handleManualPhonesChange = (text: string) => {
+    setFormData(prev => ({ ...prev, manualPhoneText: text }));
+    
+    // Parse phone numbers from text
+    const phoneNumbers = text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .filter(line => /^[0-9+\-\s()]+$/.test(line)); // Basic phone number validation
+    
+    setFormData(prev => ({ ...prev, manualPhones: phoneNumbers }));
+  };
+
+  const validatePhoneNumbers = (phones: string[]): string[] => {
+    return phones.filter(phone => {
+      // Remove all non-digit characters except +
+      const cleaned = phone.replace(/[^0-9+]/g, '');
+      // Check if it's a valid phone format (at least 8 digits, can start with +)
+      return /^(\+?[0-9]{8,15})$/.test(cleaned);
+    });
   };
 
   const handleSessionToggle = (sessionId: string) => {
@@ -258,15 +286,74 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
         );
 
       case 3:
+        const totalContacts = formData.targetContacts.length + formData.manualPhones.length;
+        const validManualPhones = validatePhoneNumbers(formData.manualPhones);
+        
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="text-center mb-4">
               <h3 className="text-lg font-semibold">Target Contacts</h3>
-              <p className="text-sm text-muted-foreground">Select who will receive this campaign</p>
+              <p className="text-sm text-muted-foreground">Select contacts or add phone numbers manually</p>
+              <div className="mt-2">
+                <span className="text-sm font-medium text-primary">
+                  Total: {totalContacts} contacts selected
+                </span>
+              </div>
             </div>
 
-            <div>
-              <Label>Contacts ({formData.targetContacts.length} selected)</Label>
+            {/* Manual Phone Numbers Section */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <span className="font-medium">Manual Phone Numbers</span>
+                <span className="text-xs text-muted-foreground">
+                  ({formData.manualPhones.length} numbers, {validManualPhones.length} valid)
+                </span>
+              </div>
+              <div>
+                <Label htmlFor="manualPhones" className="text-sm">
+                  Paste phone numbers (one per line)
+                </Label>
+                <Textarea
+                  id="manualPhones"
+                  value={formData.manualPhoneText}
+                  onChange={(e) => handleManualPhonesChange(e.target.value)}
+                  placeholder="628128045556&#10;628128045557&#10;628128045558&#10;628128045559&#10;&#10;Example formats:&#10;628128045556&#10;+628128045556&#10;08128045556"
+                  className="h-32 font-mono text-sm"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    Enter one phone number per line. Supports Indonesian format (62xxx) and international (+62xxx)
+                  </p>
+                  {formData.manualPhones.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleManualPhonesChange("")}
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                </div>
+                {formData.manualPhones.length > 0 && validManualPhones.length !== formData.manualPhones.length && (
+                  <div className="mt-2 p-2 bg-warning/10 border border-warning/20 rounded-lg">
+                    <p className="text-xs text-warning-foreground">
+                      ⚠️ {formData.manualPhones.length - validManualPhones.length} invalid phone number(s) detected. 
+                      Please check the format.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Contact List Section */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <span className="font-medium">Saved Contacts</span>
+                <span className="text-xs text-muted-foreground">
+                  ({formData.targetContacts.length} selected)
+                </span>
+              </div>
               <div className="border rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
                 <div className="flex items-center space-x-2 pb-2 border-b">
                   <Checkbox
@@ -299,6 +386,13 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
                     </Label>
                   </div>
                 ))}
+                {contacts.length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No saved contacts found</p>
+                    <p className="text-xs">Use manual input above to add phone numbers</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
