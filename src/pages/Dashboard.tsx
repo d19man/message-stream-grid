@@ -12,8 +12,10 @@ import {
   Activity,
   Plus,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const stats = {
     sessions: { total: 12, connected: 8, crm: 3, blaster: 4, warmup: 1 },
     messages: { today: 1247, thisWeek: 8932, thisMonth: 32145 },
@@ -121,7 +123,7 @@ const Dashboard = () => {
                 key={action.name}
                 variant="outline"
                 className="h-20 flex-col space-y-2 hover:shadow-elegant transition-all duration-300"
-                onClick={() => window.location.href = action.href}
+                onClick={() => navigate(action.href)}
               >
                 <div className={`p-2 rounded-lg ${action.color}`}>
                   <action.icon className="h-5 w-5 text-white" />

@@ -18,14 +18,17 @@ import {
   UserX,
   UserCheck,
 } from "lucide-react";
+import { ContactDialog } from "@/components/contacts/ContactDialog";
+import { useToast } from "@/hooks/use-toast";
 import type { Contact } from "@/types";
 
 const Contacts = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Mock data
-  const contacts: Contact[] = [
+  const initialContacts: Contact[] = [
     {
       id: "1",
       phone: "+1234567890",
@@ -82,6 +85,40 @@ const Contacts = () => {
     },
   ];
 
+  const [contacts, setContacts] = useState<Contact[]>(initialContacts);
+
+  const handleSaveContact = (contactData: Partial<Contact>) => {
+    if (contactData.id) {
+      // Edit existing contact
+      setContacts(prev => prev.map(c => 
+        c.id === contactData.id ? { ...c, ...contactData, updatedAt: new Date().toISOString() } : c
+      ));
+    } else {
+      // Create new contact
+      const newContact: Contact = {
+        id: Date.now().toString(),
+        name: contactData.name!,
+        phone: contactData.phone!,
+        tags: contactData.tags!,
+        optOut: false,
+        userId: "user1",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setContacts(prev => [...prev, newContact]);
+    }
+  };
+
+  const handleDeleteContact = (id: string) => {
+    if (confirm("Are you sure you want to delete this contact?")) {
+      setContacts(prev => prev.filter(c => c.id !== id));
+      toast({
+        title: "Success",
+        description: "Contact deleted successfully!",
+      });
+    }
+  };
+
   // Get all unique tags
   const allTags = Array.from(new Set(contacts.flatMap(contact => contact.tags)));
 
@@ -114,19 +151,16 @@ const Contacts = () => {
           <h1 className="text-3xl font-bold text-foreground">Contacts</h1>
           <p className="text-muted-foreground">Manage your contact database</p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline">
-            <Upload className="h-4 w-4 mr-2" />
-            Import
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" className="flex items-center space-x-2">
+            <Upload className="h-4 w-4" />
+            <span>Import</span>
           </Button>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
+          <Button variant="outline" className="flex items-center space-x-2">
+            <Download className="h-4 w-4" />
+            <span>Export</span>
           </Button>
-          <Button className="bg-gradient-primary hover:opacity-90">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Contact
-          </Button>
+          <ContactDialog onSave={handleSaveContact} />
         </div>
       </div>
 
@@ -312,10 +346,21 @@ const Contacts = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-1">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                        <ContactDialog 
+                          contact={contact}
+                          onSave={handleSaveContact}
+                          trigger={
+                            <Button variant="ghost" size="sm">
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          }
+                        />
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteContact(contact.id)}
+                        >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>

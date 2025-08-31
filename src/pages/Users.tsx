@@ -16,10 +16,13 @@ import {
   Crown,
   Mail,
 } from "lucide-react";
+import { UserDialog } from "@/components/users/UserDialog";
+import { useToast } from "@/hooks/use-toast";
 import type { User, Role } from "@/types";
 
 const Users = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
 
   // Mock data
   const roles: Role[] = [
@@ -49,7 +52,7 @@ const Users = () => {
     },
   ];
 
-  const users: User[] = [
+  const initialUsers: User[] = [
     {
       id: "1",
       email: "admin@company.com",
@@ -92,6 +95,40 @@ const Users = () => {
     },
   ];
 
+  const [users, setUsers] = useState<User[]>(initialUsers);
+
+  const handleSaveUser = (userData: Partial<User>) => {
+    if (userData.id) {
+      // Edit existing user
+      setUsers(prev => prev.map(u => 
+        u.id === userData.id ? { ...u, ...userData, updatedAt: new Date().toISOString() } : u
+      ));
+    } else {
+      // Create new user
+      const newUser: User = {
+        id: Date.now().toString(),
+        email: userData.email!,
+        name: userData.name!,
+        roleId: userData.roleId!,
+        role: userData.role!,
+        isActive: userData.isActive!,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setUsers(prev => [...prev, newUser]);
+    }
+  };
+
+  const handleDeleteUser = (id: string) => {
+    if (confirm("Are you sure you want to delete this user?")) {
+      setUsers(prev => prev.filter(u => u.id !== id));
+      toast({
+        title: "Success",
+        description: "User deleted successfully!",
+      });
+    }
+  };
+
   // Filter users
   const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -126,10 +163,7 @@ const Users = () => {
           <h1 className="text-3xl font-bold text-foreground">Users</h1>
           <p className="text-muted-foreground">Manage system users and their access</p>
         </div>
-        <Button className="bg-gradient-primary hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" />
-          Add User
-        </Button>
+        <UserDialog roles={roles} onSave={handleSaveUser} />
       </div>
 
       {/* Stats Cards */}
@@ -284,14 +318,26 @@ const Users = () => {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center space-x-1">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                    <div className="flex items-center space-x-1">
+                      <UserDialog 
+                        user={user}
+                        roles={roles}
+                        onSave={handleSaveUser}
+                        trigger={
+                          <Button variant="ghost" size="sm">
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        }
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteUser(user.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                     </TableCell>
                   </TableRow>
                 ))}
