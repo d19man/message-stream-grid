@@ -371,22 +371,6 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
                 )}
               </div>
               
-              {/* Predefined Tags */}
-              <div>
-                <Label className="text-xs text-muted-foreground mb-2">Quick Filter Tags</Label>
-                <div className="flex flex-wrap gap-1">
-                  {PREDEFINED_TAGS.slice(0, 6).map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant={formData.selectedTags.includes(tag) ? "default" : "outline"}
-                      className="cursor-pointer text-xs"
-                      onClick={() => handleTagToggle(tag)}
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
 
               {/* Available Tags from Contacts */}
               {allTags.length > 0 && (
