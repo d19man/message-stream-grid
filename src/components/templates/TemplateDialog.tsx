@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Edit, FileText, Image, Mic, Square } from "lucide-react";
+import { Plus, Edit, FileText, Image, Mic, Square, Layers } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Template, TemplateKind, PoolType } from "@/types";
 
@@ -66,6 +66,15 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
       return;
     }
 
+    if (formData.kind === "image_text_button" && (!formData.contentJson.mediaUrl?.trim() || !formData.contentJson.text?.trim() || !formData.contentJson.buttons?.length)) {
+      toast({
+        title: "Error",
+        description: "Image + Text + Button template requires image URL, text content, and at least one button",
+        variant: "destructive",
+      });
+      return;
+    }
+
     onSave?.(formData);
     setOpen(false);
     toast({
@@ -120,6 +129,7 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
       case "image": return <Image className="h-4 w-4" />;
       case "audio": return <Mic className="h-4 w-4" />;
       case "button": return <Square className="h-4 w-4" />;
+      case "image_text_button": return <Layers className="h-4 w-4" />;
     }
   };
 
@@ -184,6 +194,12 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                     <div className="flex items-center space-x-2">
                       {getKindIcon("button")}
                       <span>Button</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="image_text_button">
+                    <div className="flex items-center space-x-2">
+                      {getKindIcon("image_text_button")}
+                      <span>Image + Text + Button</span>
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -299,6 +315,72 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                   }))}
                   placeholder="Enter message text that will appear above buttons"
                 />
+              </div>
+              
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Label>Buttons</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addButton}>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Button
+                  </Button>
+                </div>
+                
+                <div className="space-y-2">
+                  {(formData.contentJson.buttons || []).map((button: any, index: number) => (
+                    <div key={button.id} className="flex items-center space-x-2">
+                      <Input
+                        value={button.text}
+                        onChange={(e) => updateButton(index, e.target.value)}
+                        placeholder={`Button ${index + 1} text`}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeButton(index)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {formData.kind === "image_text_button" && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="combo-image-url">Image URL</Label>
+                <Input
+                  id="combo-image-url"
+                  value={formData.contentJson.mediaUrl || ""}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    contentJson: { ...prev.contentJson, mediaUrl: e.target.value }
+                  }))}
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="combo-text">Text Content</Label>
+                <Textarea
+                  id="combo-text"
+                  value={formData.contentJson.text || ""}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    contentJson: { ...prev.contentJson, text: e.target.value }
+                  }))}
+                  placeholder="Enter message text (use {{variable}} for dynamic content)"
+                  className="min-h-[100px]"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use variables like {"{{name}}"}, {"{{company}}"} for personalization
+                </p>
               </div>
               
               <div>

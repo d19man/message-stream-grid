@@ -46,7 +46,7 @@ export interface Contact {
   updatedAt: string;
 }
 
-export type TemplateKind = 'text' | 'image' | 'audio' | 'button';
+export type TemplateKind = 'text' | 'image' | 'audio' | 'button' | 'image_text_button';
 
 export interface Template {
   id: string;

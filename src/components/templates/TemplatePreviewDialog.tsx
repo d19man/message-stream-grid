@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, FileText, Image, Mic, Square } from "lucide-react";
+import { Eye, FileText, Image, Mic, Square, Layers } from "lucide-react";
 import type { Template, TemplateKind } from "@/types";
 
 interface TemplatePreviewDialogProps {
@@ -16,6 +16,7 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
       case "image": return <Image className="h-4 w-4" />;
       case "audio": return <Mic className="h-4 w-4" />;
       case "button": return <Square className="h-4 w-4" />;
+      case "image_text_button": return <Layers className="h-4 w-4" />;
     }
   };
 
@@ -94,6 +95,45 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
       case "button":
         return (
           <div className="space-y-3">
+            <div className="bg-accent/20 rounded-lg p-4">
+              <p className="whitespace-pre-wrap mb-3">{template.contentJson.text}</p>
+              <div className="space-y-2">
+                {template.contentJson.buttons?.map((button: any, index: number) => (
+                  <Button
+                    key={button.id || index}
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                    disabled
+                  >
+                    {button.text}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case "image_text_button":
+        return (
+          <div className="space-y-3">
+            <div className="bg-gradient-accent rounded-lg aspect-video flex items-center justify-center mb-3">
+              {template.contentJson.mediaUrl ? (
+                <img 
+                  src={template.contentJson.mediaUrl} 
+                  alt="Template preview"
+                  className="max-w-full max-h-full object-contain rounded-lg"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling!.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <div className="text-muted-foreground">
+                <Image className="h-8 w-8 mx-auto mb-2" />
+                <p className="text-sm">Image Preview</p>
+              </div>
+            </div>
             <div className="bg-accent/20 rounded-lg p-4">
               <p className="whitespace-pre-wrap mb-3">{template.contentJson.text}</p>
               <div className="space-y-2">

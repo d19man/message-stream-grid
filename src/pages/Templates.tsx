@@ -12,6 +12,7 @@ import {
   Mic,
   Square,
   Eye,
+  Layers,
 } from "lucide-react";
 import { TemplateDialog } from "@/components/templates/TemplateDialog";
 import { TemplatePreviewDialog } from "@/components/templates/TemplatePreviewDialog";
@@ -127,6 +128,13 @@ const Templates = () => {
         const text = contentJson.text || "";
         const buttons = contentJson.buttons?.map((b: any) => `[${b.text}]`).join(" ") || "";
         return `${text}${buttons ? "\n" + buttons : ""}`;
+      case "image_text_button":
+        const imageText = contentJson.text?.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+          const examples: Record<string, string> = { name: "John", company: "Acme Corp" };
+          return examples[key] || `{{${key}}}`;
+        }) || "";
+        const imageButtons = contentJson.buttons?.map((b: any) => `[${b.text}]`).join(" ") || "";
+        return `📷 Image\n${imageText}${imageButtons ? "\n" + imageButtons : ""}`;
       default:
         return "Template preview";
     }
@@ -142,6 +150,8 @@ const Templates = () => {
         return <Mic className="h-4 w-4" />;
       case "button":
         return <Square className="h-4 w-4" />;
+      case "image_text_button":
+        return <Layers className="h-4 w-4" />;
     }
   };
 
@@ -163,6 +173,7 @@ const Templates = () => {
     image: templates.filter(t => t.kind === "image").length,
     audio: templates.filter(t => t.kind === "audio").length,
     button: templates.filter(t => t.kind === "button").length,
+    image_text_button: templates.filter(t => t.kind === "image_text_button").length,
   };
 
   return (
@@ -178,7 +189,7 @@ const Templates = () => {
 
       {/* Template Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TemplateKind)}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="text" className="flex items-center space-x-2">
             <FileText className="h-4 w-4" />
             <span>Text ({templateCounts.text})</span>
@@ -195,9 +206,13 @@ const Templates = () => {
             <Square className="h-4 w-4" />
             <span>Button ({templateCounts.button})</span>
           </TabsTrigger>
+          <TabsTrigger value="image_text_button" className="flex items-center space-x-2">
+            <Layers className="h-4 w-4" />
+            <span>Image+Text+Button ({templateCounts.image_text_button})</span>
+          </TabsTrigger>
         </TabsList>
 
-        {["text", "image", "audio", "button"].map((kind) => (
+        {["text", "image", "audio", "button", "image_text_button"].map((kind) => (
           <TabsContent key={kind} value={kind} className="space-y-4">
             {filteredTemplates.length === 0 ? (
               <Card className="shadow-card">
