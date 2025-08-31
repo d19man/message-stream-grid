@@ -19,7 +19,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { ContactDialog } from "@/components/contacts/ContactDialog";
-import { ImportContactDialog } from "@/components/contacts/ImportContactDialog";
+import { ImportContactDialog, SYSTEM_TYPES } from "@/components/contacts/ImportContactDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Contact } from "@/types";
 
@@ -34,6 +34,7 @@ const Contacts = () => {
       id: "1",
       phone: "+1234567890",
       name: "John Doe",
+      system: "crm",
       tags: ["customer", "vip"],
       optOut: false,
       lastContactAt: "2024-01-15T10:30:00Z",
@@ -45,6 +46,7 @@ const Contacts = () => {
       id: "2",
       phone: "+1234567891",
       name: "Jane Smith",
+      system: "blaster",
       tags: ["prospect", "enterprise"],
       optOut: false,
       lastContactAt: "2024-01-14T15:20:00Z",
@@ -56,6 +58,7 @@ const Contacts = () => {
       id: "3",
       phone: "+1234567892",
       name: "Mike Johnson",
+      system: "crm",
       tags: ["customer"],
       optOut: true,
       lastContactAt: "2024-01-13T12:15:00Z",
@@ -67,6 +70,7 @@ const Contacts = () => {
       id: "4",
       phone: "+1234567893",
       name: "Sarah Wilson",
+      system: "warmup",
       tags: ["prospect", "lead"],
       optOut: false,
       lastContactAt: "2024-01-15T09:45:00Z",
@@ -78,6 +82,7 @@ const Contacts = () => {
       id: "5",
       phone: "+1234567894",
       name: "",
+      system: "blaster",
       tags: ["cold-lead"],
       optOut: false,
       userId: "user1",
@@ -100,6 +105,7 @@ const Contacts = () => {
         id: Date.now().toString(),
         name: contactData.name!,
         phone: contactData.phone!,
+        system: contactData.system || "crm",
         tags: contactData.tags!,
         optOut: false,
         userId: "user1",
@@ -115,6 +121,7 @@ const Contacts = () => {
       id: (Date.now() + index).toString(),
       name: contactData.name || "",
       phone: contactData.phone!,
+      system: contactData.system || "crm",
       tags: contactData.tags || [],
       optOut: contactData.optOut || false,
       userId: "user1",
@@ -306,6 +313,7 @@ const Contacts = () => {
                 <TableRow>
                   <TableHead>Contact</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>System</TableHead>
                   <TableHead>Tags</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Contact</TableHead>
@@ -329,6 +337,15 @@ const Contacts = () => {
                     </TableCell>
                     <TableCell>
                       <code className="text-sm">{contact.phone}</code>
+                    </TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant="secondary" 
+                        className="flex items-center space-x-1 w-fit"
+                      >
+                        <div className={`w-2 h-2 rounded-full ${SYSTEM_TYPES.find(s => s.value === contact.system)?.color}`}></div>
+                        <span className="text-xs">{SYSTEM_TYPES.find(s => s.value === contact.system)?.label}</span>
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">

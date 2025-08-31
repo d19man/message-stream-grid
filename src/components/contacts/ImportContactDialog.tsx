@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, FileText, Tag, X } from "lucide-react";
+import { Upload, FileText, Tag, X, Smartphone, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Contact } from "@/types";
 
@@ -22,6 +22,12 @@ export const PREDEFINED_TAGS = [
   "Promotional Target"
 ];
 
+export const SYSTEM_TYPES = [
+  { value: "crm", label: "CRM", color: "bg-blue-500", description: "Customer relationship management" },
+  { value: "blaster", label: "Blaster", color: "bg-red-500", description: "Mass messaging campaigns" },
+  { value: "warmup", label: "Warming Up", color: "bg-green-500", description: "Account warming activities" },
+];
+
 interface ImportContactDialogProps {
   onImport?: (contacts: Partial<Contact>[]) => void;
 }
@@ -29,6 +35,7 @@ interface ImportContactDialogProps {
 export const ImportContactDialog = ({ onImport }: ImportContactDialogProps) => {
   const [open, setOpen] = useState(false);
   const [importText, setImportText] = useState("");
+  const [selectedSystem, setSelectedSystem] = useState<"crm" | "blaster" | "warmup">("crm");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
   const { toast } = useToast();
@@ -73,6 +80,7 @@ export const ImportContactDialog = ({ onImport }: ImportContactDialogProps) => {
         contacts.push({
           phone,
           name,
+          system: selectedSystem,
           tags: [...selectedTags],
           optOut: false,
         });
@@ -91,12 +99,14 @@ export const ImportContactDialog = ({ onImport }: ImportContactDialogProps) => {
     onImport?.(contacts);
     setOpen(false);
     setImportText("");
+    setSelectedSystem("crm");
     setSelectedTags([]);
     setCustomTag("");
 
+    const systemLabel = SYSTEM_TYPES.find(s => s.value === selectedSystem)?.label || selectedSystem;
     toast({
       title: "Success",
-      description: `Successfully imported ${contacts.length} contact(s) with ${selectedTags.length} tag(s)`,
+      description: `Successfully imported ${contacts.length} contact(s) to ${systemLabel} with ${selectedTags.length} tag(s)`,
     });
   };
 
@@ -136,6 +146,34 @@ export const ImportContactDialog = ({ onImport }: ImportContactDialogProps) => {
         </DialogHeader>
         
         <div className="space-y-6">
+          {/* System Selection */}
+          <div>
+            <Label className="flex items-center space-x-1">
+              <Smartphone className="h-4 w-4" />
+              <span>Select System</span>
+            </Label>
+            <div className="grid grid-cols-3 gap-3 mt-2">
+              {SYSTEM_TYPES.map((systemType) => (
+                <button
+                  key={systemType.value}
+                  type="button"
+                  onClick={() => setSelectedSystem(systemType.value as "crm" | "blaster" | "warmup")}
+                  className={`p-3 border-2 rounded-lg transition-all duration-200 ${
+                    selectedSystem === systemType.value
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${systemType.color}`}></div>
+                    <span className="font-medium">{systemType.label}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{systemType.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Import Data */}
           <div>
             <Label htmlFor="importData" className="flex items-center space-x-1">
@@ -218,14 +256,21 @@ export const ImportContactDialog = ({ onImport }: ImportContactDialogProps) => {
             </div>
           )}
 
-          {/* Import Preview */}
+           {/* Import Preview */}
           {importText && (
             <div>
               <Label>Import Preview</Label>
-              <div className="bg-muted/30 p-3 rounded-lg text-sm">
+              <div className="bg-muted/30 p-3 rounded-lg text-sm space-y-2">
                 <p className="font-medium">
                   {importText.trim().split('\n').filter(line => line.trim()).length} contact(s) will be imported
                 </p>
+                <div className="flex items-center space-x-2">
+                  <span className="text-muted-foreground">System:</span>
+                  <Badge variant="secondary" className="flex items-center space-x-1">
+                    <div className={`w-2 h-2 rounded-full ${SYSTEM_TYPES.find(s => s.value === selectedSystem)?.color}`}></div>
+                    <span>{SYSTEM_TYPES.find(s => s.value === selectedSystem)?.label}</span>
+                  </Badge>
+                </div>
                 {selectedTags.length > 0 && (
                   <p className="text-muted-foreground">
                     Each contact will be tagged with: {selectedTags.join(', ')}

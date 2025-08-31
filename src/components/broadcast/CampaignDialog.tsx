@@ -45,9 +45,9 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
   ];
 
   const contacts: Contact[] = [
-    { id: "1", name: "John Doe", phone: "+1234567890", tags: ["customer"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "2", name: "Jane Smith", phone: "+1234567891", tags: ["prospect"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "3", name: "Mike Johnson", phone: "+1234567892", tags: ["lead"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "1", name: "John Doe", phone: "+1234567890", system: "crm", tags: ["customer"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "2", name: "Jane Smith", phone: "+1234567891", system: "blaster", tags: ["prospect"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "3", name: "Mike Johnson", phone: "+1234567892", system: "warmup", tags: ["lead"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
   ];
 
   const sessions: Session[] = [

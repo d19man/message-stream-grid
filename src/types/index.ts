@@ -38,6 +38,7 @@ export interface Contact {
   id: string;
   phone: string;
   name?: string;
+  system: "crm" | "blaster" | "warmup";
   tags: string[];
   optOut: boolean;
   lastContactAt?: string;
