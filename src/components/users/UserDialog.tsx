@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, User as UserIcon, Mail, Shield } from "lucide-react";
+import { Plus, Edit, User as UserIcon, Mail, Shield, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { User, Role } from "@/types";
 
@@ -21,6 +21,7 @@ export const UserDialog = ({ user, roles, trigger, onSave }: UserDialogProps) =>
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || "",
+    password: "",
     roleId: user?.roleId || "",
     isActive: user?.isActive ?? true,
   });
@@ -58,6 +59,25 @@ export const UserDialog = ({ user, roles, trigger, onSave }: UserDialogProps) =>
       return;
     }
 
+    // Password validation for new users
+    if (!isEdit && !formData.password.trim()) {
+      toast({
+        title: "Error",
+        description: "Password is required for new users",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isEdit && formData.password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!formData.roleId) {
       toast({
         title: "Error",
@@ -81,7 +101,7 @@ export const UserDialog = ({ user, roles, trigger, onSave }: UserDialogProps) =>
 
     // Reset form if creating new
     if (!isEdit) {
-      setFormData({ name: "", email: "", roleId: "", isActive: true });
+      setFormData({ name: "", email: "", password: "", roleId: "", isActive: true });
     }
   };
 
@@ -133,6 +153,26 @@ export const UserDialog = ({ user, roles, trigger, onSave }: UserDialogProps) =>
               disabled={isEdit} // Don't allow email changes in edit mode
             />
           </div>
+
+          {/* Password - Only for new users */}
+          {!isEdit && (
+            <div>
+              <Label htmlFor="password" className="flex items-center space-x-1">
+                <Key className="h-4 w-4" />
+                <span>Password *</span>
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="Enter password (min. 6 characters)"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Password must be at least 6 characters long
+              </p>
+            </div>
+          )}
 
           {/* Role */}
           <div>
