@@ -45,9 +45,12 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
   ];
 
   const contacts: Contact[] = [
-    { id: "1", name: "John Doe", phone: "+1234567890", system: "crm", tags: ["customer"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "2", name: "Jane Smith", phone: "+1234567891", system: "blaster", tags: ["prospect"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "3", name: "Mike Johnson", phone: "+1234567892", system: "warmup", tags: ["lead"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "1", name: "John Doe", phone: "+62812345001", system: "crm", tags: ["customer", "VIP"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "2", name: "Jane Smith", phone: "+62812345002", system: "crm", tags: ["No Deposit After Registration"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "3", name: "Mike Johnson", phone: "+62812345003", system: "blaster", tags: ["prospect", "No Recent Deposit"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "4", name: "Sarah Wilson", phone: "+62812345004", system: "blaster", tags: ["lead"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "5", name: "Tom Brown", phone: "+62812345005", system: "warmup", tags: ["test-contact"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "6", name: "Lisa Davis", phone: "+62812345006", system: "crm", tags: ["No Recent Deposit", "customer"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
   ];
 
   const sessions: Session[] = [
@@ -194,14 +197,28 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
     }));
   };
 
-  // Get contacts filtered by selected tags
+  // Get contacts filtered by pool and selected tags
   const getFilteredContacts = () => {
-    if (formData.selectedTags.length === 0) {
-      return contacts;
+    let filtered = contacts;
+    
+    // First filter by pool/system match
+    if (formData.pool) {
+      const systemMapping: Record<PoolType, string> = {
+        'CRM': 'crm',
+        'BLASTER': 'blaster',
+        'WARMUP': 'warmup'
+      };
+      filtered = filtered.filter(contact => contact.system === systemMapping[formData.pool]);
     }
-    return contacts.filter(contact => 
-      formData.selectedTags.some(tag => contact.tags.includes(tag))
-    );
+    
+    // Then filter by selected tags
+    if (formData.selectedTags.length > 0) {
+      filtered = filtered.filter(contact => 
+        formData.selectedTags.some(tag => contact.tags.includes(tag))
+      );
+    }
+    
+    return filtered;
   };
 
   const handleTagToggle = (tag: string) => {
@@ -246,9 +263,9 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
 
             <div>
               <Label>Pool Type *</Label>
-              <Select value={formData.pool} onValueChange={(value: PoolType) => 
-                setFormData(prev => ({ ...prev, pool: value, templateId: "", sessions: [] }))
-              }>
+               <Select value={formData.pool} onValueChange={(value: PoolType) => 
+                 setFormData(prev => ({ ...prev, pool: value, templateId: "", sessions: [], selectedTags: [], targetContacts: [] }))
+               }>
                 <SelectTrigger>
                   <SelectValue placeholder="Select pool type" />
                 </SelectTrigger>
@@ -312,14 +329,29 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
         const totalContacts = formData.targetContacts.length + formData.manualPhones.length;
         const validManualPhones = validatePhoneNumbers(formData.manualPhones);
         const filteredContacts = getFilteredContacts();
-        // Get all unique tags from contacts
-        const allTags = Array.from(new Set(contacts.flatMap(contact => contact.tags)));
+        // Get all unique tags from filtered contacts (those matching the selected pool)
+        const poolFilteredContacts = formData.pool ? contacts.filter(contact => {
+          const systemMapping: Record<PoolType, string> = {
+            'CRM': 'crm',
+            'BLASTER': 'blaster',
+            'WARMUP': 'warmup'
+          };
+          return contact.system === systemMapping[formData.pool];
+        }) : contacts;
+        const allTags = Array.from(new Set(poolFilteredContacts.flatMap(contact => contact.tags)));
         
         return (
           <div className="space-y-6">
             <div className="text-center mb-4">
               <h3 className="text-lg font-semibold">Target Contacts</h3>
               <p className="text-sm text-muted-foreground">Select contacts or add phone numbers manually</p>
+              {formData.pool && (
+                <div className="mt-2">
+                  <Badge variant="secondary" className="text-xs">
+                    Targeting: {formData.pool} System
+                  </Badge>
+                </div>
+              )}
               <div className="mt-2">
                 <span className="text-sm font-medium text-primary">
                   Total: {totalContacts} contacts selected
