@@ -4,6 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Send,
   Plus,
   Play,
@@ -16,6 +26,8 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import { CampaignDialog } from "@/components/broadcast/CampaignDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -108,22 +120,56 @@ const Broadcast = () => {
   ];
 
   const [jobs, setJobs] = useState<BroadcastJob[]>(initialJobs);
+  const [editingCampaign, setEditingCampaign] = useState<BroadcastJob | null>(null);
+  const [deletingCampaignId, setDeletingCampaignId] = useState<string | null>(null);
 
   const handleSaveCampaign = (campaignData: Partial<BroadcastJob>) => {
-    const newCampaign: BroadcastJob = {
-      id: Date.now().toString(),
-      name: campaignData.name!,
-      pool: campaignData.pool!,
-      templateId: campaignData.templateId!,
-      targetContacts: campaignData.targetContacts!,
-      status: campaignData.status!,
-      planJson: campaignData.planJson!,
-      stats: campaignData.stats!,
-      userId: "user1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setJobs(prev => [...prev, newCampaign]);
+    if (editingCampaign) {
+      // Update existing campaign
+      setJobs(prev => prev.map(job => 
+        job.id === editingCampaign.id 
+          ? { ...job, ...campaignData, updatedAt: new Date().toISOString() }
+          : job
+      ));
+      setEditingCampaign(null);
+      toast({
+        title: "Success",
+        description: "Campaign updated successfully!",
+      });
+    } else {
+      // Create new campaign
+      const newCampaign: BroadcastJob = {
+        id: Date.now().toString(),
+        name: campaignData.name!,
+        pool: campaignData.pool!,
+        templateId: campaignData.templateId!,
+        targetContacts: campaignData.targetContacts!,
+        status: campaignData.status!,
+        planJson: campaignData.planJson!,
+        stats: campaignData.stats!,
+        userId: "user1",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setJobs(prev => [...prev, newCampaign]);
+      toast({
+        title: "Success",
+        description: "Campaign created successfully!",
+      });
+    }
+  };
+
+  const handleEditCampaign = (job: BroadcastJob) => {
+    setEditingCampaign(job);
+  };
+
+  const handleDeleteCampaign = (jobId: string) => {
+    setJobs(prev => prev.filter(job => job.id !== jobId));
+    setDeletingCampaignId(null);
+    toast({
+      title: "Success",
+      description: "Campaign deleted successfully!",
+    });
   };
 
   const handleCampaignAction = (jobId: string, action: string) => {
@@ -218,7 +264,11 @@ const Broadcast = () => {
           <h1 className="text-3xl font-bold text-foreground">Broadcast</h1>
           <p className="text-muted-foreground">Manage your broadcast campaigns</p>
         </div>
-        <CampaignDialog onSave={handleSaveCampaign} />
+        <CampaignDialog 
+          onSave={handleSaveCampaign} 
+          editingCampaign={editingCampaign}
+          onEditCancel={() => setEditingCampaign(null)}
+        />
       </div>
 
       {/* Stats Cards */}
@@ -296,6 +346,22 @@ const Broadcast = () => {
                 </div>
                 
                 <div className="flex items-center space-x-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleEditCampaign(job)}
+                  >
+                    <Edit className="h-3 w-3 mr-1" />
+                    Edit
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setDeletingCampaignId(job.id)}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Delete
+                  </Button>
                   {job.status === "draft" && (
                     <Button 
                       size="sm" 
@@ -325,7 +391,7 @@ const Broadcast = () => {
                       <Play className="h-3 w-3 mr-1" />
                       Resume
                     </Button>
-                  )}
+                    )}
                   {job.status === "failed" && (
                     <Button 
                       size="sm" 
@@ -394,6 +460,27 @@ const Broadcast = () => {
           </Card>
         ))}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingCampaignId} onOpenChange={(open) => !open && setDeletingCampaignId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Campaign</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this campaign? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deletingCampaignId && handleDeleteCampaign(deletingCampaignId)}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

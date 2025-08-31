@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,11 @@ import { PREDEFINED_TAGS } from "../contacts/ImportContactDialog";
 interface CampaignDialogProps {
   trigger?: React.ReactNode;
   onSave?: (campaign: Partial<BroadcastJob>) => void;
+  editingCampaign?: BroadcastJob | null;
+  onEditCancel?: () => void;
 }
 
-export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
+export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel }: CampaignDialogProps) => {
   const [open, setOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -35,6 +37,29 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
     endAt: "",
     quietHours: [] as number[],
   });
+  
+  // Effect to handle editing mode
+  useEffect(() => {
+    if (editingCampaign) {
+      setFormData({
+        name: editingCampaign.name,
+        pool: editingCampaign.pool,
+        templateId: editingCampaign.templateId,
+        targetContacts: editingCampaign.targetContacts || [],
+        manualPhones: [],
+        manualPhoneText: "",
+        selectedTags: [],
+        delayMin: editingCampaign.planJson.delayMin,
+        delayMax: editingCampaign.planJson.delayMax,
+        sessions: editingCampaign.planJson.sessions,
+        startAt: editingCampaign.planJson.schedule?.startAt || "",
+        endAt: editingCampaign.planJson.schedule?.endAt || "",
+        quietHours: editingCampaign.planJson.schedule?.quietHours || [],
+      });
+      setOpen(true);
+    }
+  }, [editingCampaign]);
+
   const { toast } = useToast();
 
   // Mock data - in real app, these would come from API
@@ -134,10 +159,6 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
     onSave?.(campaignData);
     setOpen(false);
     setCurrentStep(1);
-    toast({
-      title: "Success",
-      description: "Campaign created successfully!",
-    });
 
     // Reset form
     setFormData({
@@ -155,6 +176,9 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
       endAt: "",
       quietHours: [],
     });
+
+    // Reset editing state
+    onEditCancel?.();
   };
 
   const handleContactToggle = (contactId: string) => {
@@ -601,7 +625,7 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Send className="h-5 w-5" />
-            <span>Create New Campaign</span>
+            <span>{editingCampaign ? "Edit Campaign" : "Create New Campaign"}</span>
           </DialogTitle>
         </DialogHeader>
         
@@ -647,7 +671,7 @@ export const CampaignDialog = ({ trigger, onSave }: CampaignDialogProps) => {
               </Button>
             ) : (
               <Button onClick={handleSave} className="bg-gradient-primary hover:opacity-90">
-                Create Campaign
+                {editingCampaign ? "Update Campaign" : "Create Campaign"}
               </Button>
             )}
           </div>
