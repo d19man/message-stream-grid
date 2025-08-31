@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { PoolType, AIAgentSetting, WarmingPolicy } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("ai");
@@ -142,24 +143,21 @@ Keep responses natural, brief, and engaging.`,
 
   const handleSaveApiKey = async (provider: string) => {
     try {
-      // In a real app, this would call an edge function to save the API key securely
-      const response = await fetch("/api/save-api-key", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('save-api-key', {
+        body: {
           provider,
           apiKey: apiKeys[provider as keyof typeof apiKeys],
-        }),
+        },
       });
 
-      if (response.ok) {
-        setApiKeySaved(prev => ({ ...prev, [provider]: true }));
-        setTimeout(() => {
-          setApiKeySaved(prev => ({ ...prev, [provider]: false }));
-        }, 3000);
+      if (error) {
+        throw error;
       }
+
+      setApiKeySaved(prev => ({ ...prev, [provider]: true }));
+      setTimeout(() => {
+        setApiKeySaved(prev => ({ ...prev, [provider]: false }));
+      }, 3000);
     } catch (error) {
       console.error("Failed to save API key:", error);
     }
