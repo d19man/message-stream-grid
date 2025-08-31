@@ -12,14 +12,21 @@ import {
   Trash2,
   QrCode,
   Zap,
+  Send,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { SessionDialog } from "@/components/sessions/SessionDialog";
+import { QRDialog } from "@/components/sessions/QRDialog";
+import { useToast } from "@/hooks/use-toast";
 import type { Session, PoolType, SessionStatus } from "@/types";
 
 const Sessions = () => {
   const [activeTab, setActiveTab] = useState<PoolType>("CRM");
+  const navigate = useNavigate();
+  const { toast } = useToast();
   
   // Mock data
-  const sessions: Session[] = [
+  const initialSessions: Session[] = [
     {
       id: "1",
       name: "CRM-Main",
@@ -63,6 +70,52 @@ const Sessions = () => {
       updatedAt: "2024-01-15T07:00:00Z",
     },
   ];
+
+  const [sessions, setSessions] = useState<Session[]>(initialSessions);
+
+  const handleSaveSession = (sessionData: Partial<Session>) => {
+    const newSession: Session = {
+      id: Date.now().toString(),
+      name: sessionData.name!,
+      pool: sessionData.pool!,
+      status: "qr_ready",
+      userId: "user1",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setSessions(prev => [...prev, newSession]);
+  };
+
+  const handleDeleteSession = (id: string) => {
+    if (confirm("Are you sure you want to delete this session? This action cannot be undone.")) {
+      setSessions(prev => prev.filter(s => s.id !== id));
+      toast({
+        title: "Success",
+        description: "Session deleted successfully!",
+      });
+    }
+  };
+
+  const handleReconnect = (sessionId: string) => {
+    setSessions(prev => prev.map(s => 
+      s.id === sessionId ? { ...s, status: "connecting" as SessionStatus, updatedAt: new Date().toISOString() } : s
+    ));
+    toast({
+      title: "Reconnecting",
+      description: "Attempting to reconnect session...",
+    });
+    
+    // Simulate reconnection process
+    setTimeout(() => {
+      setSessions(prev => prev.map(s => 
+        s.id === sessionId ? { ...s, status: "qr_ready" as SessionStatus } : s
+      ));
+    }, 2000);
+  };
+
+  const handleNewCampaign = () => {
+    navigate("/broadcast");
+  };
 
   const getStatusIcon = (status: SessionStatus) => {
     switch (status) {
@@ -113,10 +166,13 @@ const Sessions = () => {
           <h1 className="text-3xl font-bold text-foreground">Sessions</h1>
           <p className="text-muted-foreground">Manage your WhatsApp sessions across different pools</p>
         </div>
-        <Button className="bg-gradient-primary hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Session
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={handleNewCampaign}>
+            <Send className="h-4 w-4 mr-2" />
+            New Campaign
+          </Button>
+          <SessionDialog onSave={handleSaveSession} />
+        </div>
       </div>
 
       {/* Pool Tabs */}
@@ -146,10 +202,15 @@ const Sessions = () => {
                   <p className="text-muted-foreground text-center mb-4">
                     Create your first {pool.toLowerCase()} session to start messaging
                   </p>
-                  <Button className="bg-gradient-primary hover:opacity-90">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add {pool} Session
-                  </Button>
+                  <SessionDialog 
+                    onSave={handleSaveSession}
+                    trigger={
+                      <Button className="bg-gradient-primary hover:opacity-90">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add {pool} Session
+                      </Button>
+                    }
+                  />
                 </CardContent>
               </Card>
             ) : (
@@ -182,18 +243,33 @@ const Sessions = () => {
                       
                       <div className="flex space-x-2 pt-2">
                         {session.status === "qr_ready" && (
-                          <Button size="sm" variant="outline" className="flex-1">
-                            <QrCode className="h-3 w-3 mr-1" />
-                            QR
-                          </Button>
+                          <QRDialog 
+                            sessionName={session.name}
+                            trigger={
+                              <Button size="sm" variant="outline" className="flex-1">
+                                <QrCode className="h-3 w-3 mr-1" />
+                                QR
+                              </Button>
+                            }
+                          />
                         )}
                         {session.status === "disconnected" && (
-                          <Button size="sm" variant="outline" className="flex-1">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={() => handleReconnect(session.id)}
+                          >
                             <RotateCcw className="h-3 w-3 mr-1" />
                             Reconnect
                           </Button>
                         )}
-                        <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteSession(session.id)}
+                        >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
