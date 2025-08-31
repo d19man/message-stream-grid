@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const SettingsDropdown = () => {
   const [darkMode, setDarkMode] = useState(false);
@@ -42,6 +43,7 @@ export const SettingsDropdown = () => {
   const [autoConnect, setAutoConnect] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signOut } = useAuth();
 
   const handleThemeChange = (theme: "light" | "dark" | "system") => {
     setDarkMode(theme === "dark");
@@ -70,20 +72,20 @@ export const SettingsDropdown = () => {
     });
   };
 
-  const handleLogout = () => {
-    // Clear any stored auth data
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("user");
-    
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out",
-    });
-    
-    // Redirect to login or home page
-    setTimeout(() => {
-      window.location.href = "/";
-    }, 1000);
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Berhasil Logout",
+        description: "Anda telah berhasil keluar dari sistem",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal logout. Silakan coba lagi.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExportData = () => {
