@@ -22,16 +22,21 @@ const Login = () => {
     setLoading(true);
 
     try {
+      console.log('Login: Attempting login for', email);
       const { error } = await signIn(email, password);
       
       if (error) {
+        console.log('Login: Error occurred', error.message);
         setError(error.message);
+        setLoading(false);
       } else {
+        console.log('Login: Success, navigating to dashboard...');
+        // Don't set loading to false here, let AuthContext handle it
         navigate('/');
       }
     } catch (err) {
+      console.error('Login: Exception occurred', err);
       setError('Terjadi kesalahan saat login');
-    } finally {
       setLoading(false);
     }
   };
