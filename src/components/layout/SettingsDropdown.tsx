@@ -30,13 +30,11 @@ import {
   Volume2,
   VolumeX,
   Wifi,
-  HardDrive,
-  KeyRound
+  HardDrive
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 
 export const SettingsDropdown = () => {
   const [darkMode, setDarkMode] = useState(false);
@@ -168,15 +166,10 @@ export const SettingsDropdown = () => {
           Profile Settings
         </DropdownMenuItem>
 
-        {/* Change Password */}
-        <ChangePasswordDialog 
-          trigger={
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              <KeyRound className="h-4 w-4 mr-2" />
-              Ubah Password
-            </DropdownMenuItem>
-          }
-        />
+        <DropdownMenuItem onClick={() => navigate("/change-password")}>
+          <Shield className="h-4 w-4 mr-2" />
+          Ubah Password
+        </DropdownMenuItem>
 
         {/* Theme */}
         <DropdownMenuSub>
