@@ -13,10 +13,12 @@ import {
   QrCode,
   Zap,
   Send,
+  KeyRound,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SessionDialog } from "@/components/sessions/SessionDialog";
 import { QRDialog } from "@/components/sessions/QRDialog";
+import { PairingDialog } from "@/components/sessions/PairingDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Session, PoolType, SessionStatus } from "@/types";
 
@@ -73,12 +75,13 @@ const Sessions = () => {
 
   const [sessions, setSessions] = useState<Session[]>(initialSessions);
 
-  const handleSaveSession = (sessionData: Partial<Session>) => {
+  const handleSaveSession = (sessionData: Partial<Session> & { connectionMethod?: string }) => {
+    const status = sessionData.connectionMethod === "pairing" ? "pairing" : "qr_ready";
     const newSession: Session = {
       id: Date.now().toString(),
       name: sessionData.name!,
       pool: sessionData.pool!,
-      status: "qr_ready",
+      status: status as SessionStatus,
       userId: "user1",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -248,7 +251,18 @@ const Sessions = () => {
                             trigger={
                               <Button size="sm" variant="outline" className="flex-1">
                                 <QrCode className="h-3 w-3 mr-1" />
-                                QR
+                                QR Code
+                              </Button>
+                            }
+                          />
+                        )}
+                        {session.status === "pairing" && (
+                          <PairingDialog 
+                            sessionName={session.name}
+                            trigger={
+                              <Button size="sm" variant="outline" className="flex-1">
+                                <KeyRound className="h-3 w-3 mr-1" />
+                                Pairing Code
                               </Button>
                             }
                           />

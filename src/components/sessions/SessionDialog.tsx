@@ -4,9 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Smartphone, Zap, Wifi } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Plus, Smartphone, Zap, Wifi, QrCode, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Session, PoolType } from "@/types";
+
+type ConnectionMethod = "qr" | "pairing";
 
 interface SessionDialogProps {
   trigger?: React.ReactNode;
@@ -18,6 +21,7 @@ export const SessionDialog = ({ trigger, onSave }: SessionDialogProps) => {
   const [formData, setFormData] = useState({
     name: "",
     pool: "" as PoolType | "",
+    connectionMethod: "qr" as ConnectionMethod,
   });
   const { toast } = useToast();
 
@@ -40,15 +44,16 @@ export const SessionDialog = ({ trigger, onSave }: SessionDialogProps) => {
       return;
     }
 
-    onSave?.(formData as Partial<Session>);
+    const sessionStatus = formData.connectionMethod === "qr" ? "qr_ready" : "pairing";
+    onSave?.({ ...formData, status: sessionStatus } as Partial<Session>);
     setOpen(false);
     toast({
       title: "Success",
-      description: "Session created successfully! Please scan QR code to connect.",
+      description: `Session created successfully! Please use ${formData.connectionMethod === "qr" ? "QR code" : "pairing code"} to connect.`,
     });
 
     // Reset form
-    setFormData({ name: "", pool: "" as PoolType | "" });
+    setFormData({ name: "", pool: "" as PoolType | "", connectionMethod: "qr" });
   };
 
   const getPoolIcon = (pool: string) => {
@@ -140,10 +145,46 @@ export const SessionDialog = ({ trigger, onSave }: SessionDialogProps) => {
             </Select>
           </div>
 
+          {/* Connection Method */}
+          <div>
+            <Label>Connection Method *</Label>
+            <RadioGroup 
+              value={formData.connectionMethod} 
+              onValueChange={(value: ConnectionMethod) => 
+                setFormData(prev => ({ ...prev, connectionMethod: value }))
+              }
+              className="mt-2"
+            >
+              <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-accent">
+                <RadioGroupItem value="qr" id="qr" />
+                <div className="flex items-center space-x-2 flex-1">
+                  <QrCode className="h-4 w-4 text-primary" />
+                  <div className="flex-1">
+                    <Label htmlFor="qr" className="font-medium cursor-pointer">QR Code</Label>
+                    <p className="text-xs text-muted-foreground">Scan QR code with WhatsApp mobile app</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-accent">
+                <RadioGroupItem value="pairing" id="pairing" />
+                <div className="flex items-center space-x-2 flex-1">
+                  <KeyRound className="h-4 w-4 text-primary" />
+                  <div className="flex-1">
+                    <Label htmlFor="pairing" className="font-medium cursor-pointer">Pairing Code</Label>
+                    <p className="text-xs text-muted-foreground">Enter 8-digit code in WhatsApp settings</p>
+                  </div>
+                </div>
+              </div>
+            </RadioGroup>
+          </div>
+
           {/* Info */}
           <div className="bg-muted rounded-lg p-3">
             <p className="text-sm text-muted-foreground">
-              After creating the session, you'll need to scan a QR code to connect your WhatsApp account.
+              {formData.connectionMethod === "qr" 
+                ? "After creating the session, you'll need to scan a QR code to connect your WhatsApp account."
+                : "After creating the session, you'll get an 8-digit pairing code to enter in WhatsApp settings."
+              }
             </p>
           </div>
 
