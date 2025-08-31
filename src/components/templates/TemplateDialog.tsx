@@ -319,12 +319,15 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
               
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <Label>Buttons</Label>
+                  <Label>Interactive Buttons</Label>
                   <Button type="button" variant="outline" size="sm" onClick={addButton}>
                     <Plus className="h-3 w-3 mr-1" />
                     Add Button
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Button names that will appear as interactive buttons in WhatsApp
+                </p>
                 
                 <div className="space-y-2">
                   {(formData.contentJson.buttons || []).map((button: any, index: number) => (
@@ -332,7 +335,7 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                       <Input
                         value={button.text}
                         onChange={(e) => updateButton(index, e.target.value)}
-                        placeholder={`Button ${index + 1} text`}
+                        placeholder={`Interactive button name (e.g., "DAFTAR SEKARANG", "HUBUNGI KAMI")`}
                         className="flex-1"
                       />
                       <Button
@@ -385,12 +388,15 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
               
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <Label>Buttons</Label>
+                  <Label>Interactive Buttons</Label>
                   <Button type="button" variant="outline" size="sm" onClick={addButton}>
                     <Plus className="h-3 w-3 mr-1" />
                     Add Button
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Button names that will appear as interactive buttons in WhatsApp
+                </p>
                 
                 <div className="space-y-2">
                   {(formData.contentJson.buttons || []).map((button: any, index: number) => (
@@ -398,7 +404,7 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                       <Input
                         value={button.text}
                         onChange={(e) => updateButton(index, e.target.value)}
-                        placeholder={`Button ${index + 1} text`}
+                        placeholder={`Interactive button name (e.g., "DAFTAR SEKARANG", "HUBUNGI KAMI")`}
                         className="flex-1"
                       />
                       <Button
