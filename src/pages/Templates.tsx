@@ -13,13 +13,15 @@ import {
   Square,
   Eye,
 } from "lucide-react";
+import { TemplateDialog } from "@/components/templates/TemplateDialog";
+import { TemplatePreviewDialog } from "@/components/templates/TemplatePreviewDialog";
 import type { Template, TemplateKind, PoolType } from "@/types";
 
 const Templates = () => {
   const [activeTab, setActiveTab] = useState<TemplateKind>("text");
 
-  // Mock data
-  const templates: Template[] = [
+  // Mock data - replace with API call
+  const mockTemplates: Template[] = [
     {
       id: "1",
       name: "Welcome Message",
@@ -81,6 +83,55 @@ const Templates = () => {
     },
   ];
 
+  const [templates, setTemplates] = useState<Template[]>(mockTemplates);
+
+  const handleSaveTemplate = (templateData: Partial<Template>) => {
+    if (templateData.id) {
+      // Edit existing template
+      setTemplates(prev => prev.map(t => 
+        t.id === templateData.id ? { ...t, ...templateData, updatedAt: new Date().toISOString() } : t
+      ));
+    } else {
+      // Create new template
+      const newTemplate: Template = {
+        id: Date.now().toString(),
+        name: templateData.name!,
+        kind: templateData.kind!,
+        allowedIn: templateData.allowedIn!,
+        contentJson: templateData.contentJson!,
+        preview: generatePreview(templateData.kind!, templateData.contentJson!),
+        userId: "user1",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setTemplates(prev => [...prev, newTemplate]);
+    }
+  };
+
+  const handleDeleteTemplate = (id: string) => {
+    setTemplates(prev => prev.filter(t => t.id !== id));
+  };
+
+  const generatePreview = (kind: TemplateKind, contentJson: any): string => {
+    switch (kind) {
+      case "text":
+        return contentJson.text?.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+          const examples: Record<string, string> = { name: "John", company: "Acme Corp" };
+          return examples[key] || `{{${key}}}`;
+        }) || "";
+      case "image":
+        return contentJson.caption || "📷 Image message";
+      case "audio":
+        return "🎵 " + (contentJson.caption || "Audio message");
+      case "button":
+        const text = contentJson.text || "";
+        const buttons = contentJson.buttons?.map((b: any) => `[${b.text}]`).join(" ") || "";
+        return `${text}${buttons ? "\n" + buttons : ""}`;
+      default:
+        return "Template preview";
+    }
+  };
+
   const getKindIcon = (kind: TemplateKind) => {
     switch (kind) {
       case "text":
@@ -122,10 +173,7 @@ const Templates = () => {
           <h1 className="text-3xl font-bold text-foreground">Templates</h1>
           <p className="text-muted-foreground">Manage your message templates for different pools</p>
         </div>
-        <Button className="bg-gradient-primary hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" />
-          New Template
-        </Button>
+        <TemplateDialog onSave={handleSaveTemplate} />
       </div>
 
       {/* Template Tabs */}
@@ -162,8 +210,15 @@ const Templates = () => {
                     Create your first {kind} template to get started
                   </p>
                   <Button className="bg-gradient-primary hover:opacity-90">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create {kind} template
+                    <TemplateDialog 
+                      onSave={handleSaveTemplate}
+                      trigger={
+                        <div className="flex items-center">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create {kind} template
+                        </div>
+                      }
+                    />
                   </Button>
                 </CardContent>
               </Card>
@@ -178,13 +233,29 @@ const Templates = () => {
                           <span>{template.name}</span>
                         </CardTitle>
                         <div className="flex items-center space-x-1">
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                          <TemplatePreviewDialog 
+                            template={template}
+                            trigger={
+                              <Button variant="ghost" size="sm">
+                                <Eye className="h-3 w-3" />
+                              </Button>
+                            }
+                          />
+                          <TemplateDialog 
+                            template={template}
+                            onSave={handleSaveTemplate}
+                            trigger={
+                              <Button variant="ghost" size="sm">
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            }
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteTemplate(template.id)}
+                          >
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>

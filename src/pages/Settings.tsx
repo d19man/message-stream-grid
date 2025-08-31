@@ -5,8 +5,10 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Bell,
   Bot,
   Clock,
   Database,
@@ -17,10 +19,12 @@ import {
   CheckCircle,
   Settings as SettingsIcon,
 } from "lucide-react";
+import { useNotifications } from "@/hooks/useNotifications";
 import type { PoolType, AIAgentSetting, WarmingPolicy } from "@/types";
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("ai");
+  const { settings: notificationSettings, updateSettings: updateNotificationSettings, testNotification } = useNotifications();
 
   // Mock AI Agent Settings
   const [aiSettings, setAiSettings] = useState<Record<PoolType, AIAgentSetting>>({
@@ -148,7 +152,7 @@ Keep responses natural, brief, and engaging.`,
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="ai" className="flex items-center space-x-2">
             <Bot className="h-4 w-4" />
             <span>AI Agents</span>
@@ -156,6 +160,10 @@ Keep responses natural, brief, and engaging.`,
           <TabsTrigger value="warming" className="flex items-center space-x-2">
             <Zap className="h-4 w-4" />
             <span>Warming Policy</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center space-x-2">
+            <Bell className="h-4 w-4" />
+            <span>Notifications</span>
           </TabsTrigger>
           <TabsTrigger value="system" className="flex items-center space-x-2">
             <SettingsIcon className="h-4 w-4" />
@@ -446,6 +454,67 @@ Keep responses natural, brief, and engaging.`,
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Notifications Tab */}
+        <TabsContent value="notifications" className="space-y-6">
+          {(["CRM", "BLASTER", "WARMUP"] as PoolType[]).map((pool) => (
+            <Card key={pool} className="shadow-card">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Bell className="h-5 w-5 text-primary" />
+                  <span>{pool} Notifications</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-medium">Enable Notifications</Label>
+                    <p className="text-xs text-muted-foreground">Show notifications for new {pool} messages</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">Notification Sound</Label>
+                    <Select defaultValue={`${pool.toLowerCase()}-notification.mp3`}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={`${pool.toLowerCase()}-notification.mp3`}>Default {pool} Sound</SelectItem>
+                        <SelectItem value="notification-1.mp3">Notification Bell</SelectItem>
+                        <SelectItem value="notification-2.mp3">Message Ping</SelectItem>
+                        <SelectItem value="notification-3.mp3">Soft Chime</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <Label className="text-sm font-medium">Volume</Label>
+                      <span className="text-sm text-muted-foreground">70%</span>
+                    </div>
+                    <Input
+                      type="range"
+                      min="0"
+                      max="100"
+                      defaultValue="70"
+                      className="w-full"
+                    />
+                  </div>
+                  
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => testNotification(pool)}>
+                      <Bell className="h-3 w-3 mr-1" />
+                      Test Notification
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </TabsContent>
 
         {/* System Tab */}
