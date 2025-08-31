@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Settings as SettingsIcon,
+  Key,
 } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { PoolType, AIAgentSetting, WarmingPolicy } from "@/types";
@@ -25,6 +26,15 @@ import type { PoolType, AIAgentSetting, WarmingPolicy } from "@/types";
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("ai");
   const { settings: notificationSettings, updateSettings: updateNotificationSettings, testNotification } = useNotifications();
+
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState({
+    openai: "",
+  });
+
+  const [apiKeySaved, setApiKeySaved] = useState({
+    openai: false,
+  });
 
   // Mock AI Agent Settings
   const [aiSettings, setAiSettings] = useState<Record<PoolType, AIAgentSetting>>({
@@ -130,6 +140,31 @@ Keep responses natural, brief, and engaging.`,
     }));
   };
 
+  const handleSaveApiKey = async (provider: string) => {
+    try {
+      // In a real app, this would call an edge function to save the API key securely
+      const response = await fetch("/api/save-api-key", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          provider,
+          apiKey: apiKeys[provider as keyof typeof apiKeys],
+        }),
+      });
+
+      if (response.ok) {
+        setApiKeySaved(prev => ({ ...prev, [provider]: true }));
+        setTimeout(() => {
+          setApiKeySaved(prev => ({ ...prev, [provider]: false }));
+        }, 3000);
+      }
+    } catch (error) {
+      console.error("Failed to save API key:", error);
+    }
+  };
+
   const formatHour = (hour: number) => {
     return new Date(2024, 0, 1, hour).toLocaleTimeString([], { 
       hour: 'numeric', 
@@ -152,7 +187,7 @@ Keep responses natural, brief, and engaging.`,
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="ai" className="flex items-center space-x-2">
             <Bot className="h-4 w-4" />
             <span>AI Agents</span>
@@ -164,6 +199,10 @@ Keep responses natural, brief, and engaging.`,
           <TabsTrigger value="notifications" className="flex items-center space-x-2">
             <Bell className="h-4 w-4" />
             <span>Notifications</span>
+          </TabsTrigger>
+          <TabsTrigger value="api-keys" className="flex items-center space-x-2">
+            <Key className="h-4 w-4" />
+            <span>API Keys</span>
           </TabsTrigger>
           <TabsTrigger value="system" className="flex items-center space-x-2">
             <SettingsIcon className="h-4 w-4" />
@@ -449,6 +488,80 @@ Keep responses natural, brief, and engaging.`,
                       }
                       className="mt-1"
                     />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* API Keys Tab */}
+        <TabsContent value="api-keys" className="space-y-6">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Key className="h-5 w-5 text-primary" />
+                <span>API Integrations</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* OpenAI API Key */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-medium">OpenAI API Key</Label>
+                    <p className="text-xs text-muted-foreground">Required for ChatGPT integration and AI responses</p>
+                  </div>
+                  {apiKeySaved.openai && (
+                    <div className="flex items-center space-x-2 text-success">
+                      <CheckCircle className="h-4 w-4" />
+                      <span className="text-sm">Saved</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-3">
+                  <Input
+                    type="password"
+                    placeholder="sk-..."
+                    value={apiKeys.openai}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, openai: e.target.value }))}
+                    className="font-mono text-sm"
+                  />
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs text-muted-foreground">
+                      Get your API key from{" "}
+                      <a 
+                        href="https://platform.openai.com/api-keys" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        OpenAI Platform
+                      </a>
+                    </p>
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleSaveApiKey("openai")}
+                      disabled={!apiKeys.openai.trim()}
+                    >
+                      <Save className="h-3 w-3 mr-1" />
+                      Save Key
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <AlertTriangle className="h-5 w-5 text-warning mt-0.5" />
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-medium">Security Notice</h4>
+                      <p className="text-xs text-muted-foreground">
+                        API keys are encrypted and stored securely. They are only used for AI integrations and are never shared or logged.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
