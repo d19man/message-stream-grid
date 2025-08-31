@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Sessions from "./pages/Sessions";
+import PoolSessions from "./pages/PoolSessions";
 import Inbox from "./pages/Inbox";
 import Broadcast from "./pages/Broadcast";
 import Templates from "./pages/Templates";
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/" element={<DashboardLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="sessions" element={<Sessions />} />
+            <Route path="pool-sessions" element={<PoolSessions />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="broadcast" element={<Broadcast />} />
             <Route path="templates" element={<Templates />} />

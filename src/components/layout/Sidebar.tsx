@@ -49,6 +49,7 @@ import { useToast } from "@/hooks/use-toast";
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Sessions", href: "/sessions", icon: Smartphone },
+  { name: "Pool Sessions", href: "/pool-sessions", icon: Shield },
   { name: "Inbox", href: "/inbox", icon: MessageSquare },
   { name: "Broadcast", href: "/broadcast", icon: Send },
   { name: "Templates", href: "/templates", icon: FileText },

@@ -31,10 +31,12 @@ const Roles = () => {
       name: "Admin",
       permissions: [
         "manage:session", "view:session",
+        "view:pool-session", "transfer:pool-session", "delete:pool-session",
         "manage:broadcast", "view:broadcast", "start:blast", "stop:blast",
         "manage:template", "view:template",
         "manage:inbox:crm", "view:inbox:crm",
         "manage:inbox:blaster", "view:inbox:blaster",
+        "manage:inbox:warmup", "view:inbox:warmup",
         "manage:user", "view:user"
       ],
       description: "System administrator with most permissions",
@@ -43,15 +45,18 @@ const Roles = () => {
     },
     {
       id: "3",
-      name: "Marketing Manager",
+      name: "Provisioning Manager",
       permissions: [
         "view:session",
-        "manage:broadcast", "view:broadcast", "start:blast",
-        "manage:template", "view:template",
-        "view:inbox:blaster",
+        "view:pool-session", "transfer:pool-session", "delete:pool-session",
+        "view:broadcast", "start:blast", "stop:blast",
+        "view:template",
+        "manage:inbox:crm", "view:inbox:crm",
+        "manage:inbox:blaster", "view:inbox:blaster",
+        "manage:inbox:warmup", "view:inbox:warmup",
         "view:user"
       ],
-      description: "Can manage marketing campaigns and templates",
+      description: "Can manage sessions and pools but cannot create new sessions",
       createdAt: "2024-01-05T00:00:00Z",
       updatedAt: "2024-01-10T15:30:00Z",
     },
@@ -74,6 +79,7 @@ const Roles = () => {
   const allPermissions = [
     { group: "Users & Roles", permissions: ["manage:user", "view:user", "manage:role", "view:role"] },
     { group: "Sessions", permissions: ["manage:session", "view:session"] },
+    { group: "Pool Sessions", permissions: ["view:pool-session", "create:pool-session", "transfer:pool-session", "delete:pool-session", "purge:pool-session"] },
     { group: "CRM Inbox", permissions: ["manage:inbox:crm", "view:inbox:crm"] },
     { group: "Blaster Inbox", permissions: ["manage:inbox:blaster", "view:inbox:blaster"] },
     { group: "Warmup Inbox", permissions: ["manage:inbox:warmup", "view:inbox:warmup"] },
