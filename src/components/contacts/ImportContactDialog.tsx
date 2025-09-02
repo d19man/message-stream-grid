@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Upload, FileText, Tag, X, Smartphone, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Contact } from "@/types";
 
 // Predefined tags for grouping
@@ -39,6 +40,44 @@ export const ImportContactDialog = ({ onImport }: ImportContactDialogProps) => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
   const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Filter available systems based on user role
+  const getAvailableSystems = () => {
+    if (!profile?.role) return SYSTEM_TYPES.filter(s => s.value === "crm");
+    
+    switch (profile.role) {
+      case 'crm':
+        return SYSTEM_TYPES.filter(s => s.value === "crm");
+      case 'blaster':
+        return SYSTEM_TYPES.filter(s => s.value === "blaster");
+      case 'warmup':
+        return SYSTEM_TYPES.filter(s => s.value === "warmup");
+      case 'admin':
+      case 'superadmin':
+        return SYSTEM_TYPES;
+      default:
+        return SYSTEM_TYPES.filter(s => s.value === "crm");
+    }
+  };
+
+  const availableSystems = getAvailableSystems();
+
+  // Set default system based on user role
+  const getDefaultSystem = (): "crm" | "blaster" | "warmup" => {
+    if (!profile?.role) return "crm";
+    
+    switch (profile.role) {
+      case 'crm':
+        return "crm";
+      case 'blaster':
+        return "blaster";
+      case 'warmup':
+        return "warmup";
+      default:
+        return "crm";
+    }
+  };
 
   const handleImport = () => {
     if (!importText.trim()) {
@@ -99,7 +138,7 @@ export const ImportContactDialog = ({ onImport }: ImportContactDialogProps) => {
     onImport?.(contacts);
     setOpen(false);
     setImportText("");
-    setSelectedSystem("crm");
+    setSelectedSystem(getDefaultSystem());
     setSelectedTags([]);
     setCustomTag("");
 
@@ -152,8 +191,8 @@ export const ImportContactDialog = ({ onImport }: ImportContactDialogProps) => {
               <Smartphone className="h-4 w-4" />
               <span>Select System</span>
             </Label>
-            <div className="grid grid-cols-3 gap-3 mt-2">
-              {SYSTEM_TYPES.map((systemType) => (
+            <div className={`grid gap-3 mt-2 ${availableSystems.length === 1 ? 'grid-cols-1' : availableSystems.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              {availableSystems.map((systemType) => (
                 <button
                   key={systemType.value}
                   type="button"
