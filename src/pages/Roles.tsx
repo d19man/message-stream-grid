@@ -42,7 +42,7 @@ const Roles = () => {
         "manage:inbox:warmup", "view:inbox:warmup",
         "manage:user", "view:user"
       ],
-      description: "System administrator with most permissions",
+      description: "System administrator with most permissions (19 permissions)",
       createdAt: "2024-01-01T00:00:00Z",
       updatedAt: "2024-01-15T10:00:00Z",
     },
@@ -88,19 +88,6 @@ const Roles = () => {
       createdAt: "2024-01-10T00:00:00Z",
       updatedAt: "2024-01-18T14:45:00Z",
     },
-    {
-      id: "6",
-      name: "CRM Operator",
-      permissions: [
-        "view:session",
-        "manage:inbox:crm", "view:inbox:crm",
-        "view:template",
-        "view:broadcast"
-      ],
-      description: "Basic CRM operations and customer support",
-      createdAt: "2024-01-08T00:00:00Z",
-      updatedAt: "2024-01-12T09:20:00Z",
-    },
   ];
 
   // Filter roles based on user level - hide superadmin from non-superadmin users
@@ -120,6 +107,33 @@ const Roles = () => {
     { group: "Templates", permissions: ["manage:template", "view:template"] },
     { group: "AI Agent", permissions: ["manage:ai", "view:ai"] },
   ];
+
+  // Get current user permissions for admin editing
+  const getCurrentUserPermissions = () => {
+    if (profile?.role === "superadmin") return ["*"]; // Superadmin has all permissions
+    if (profile?.role === "admin") {
+      // Return the admin's 19 permissions
+      return [
+        "manage:session", "view:session",
+        "view:pool-session", "transfer:pool-session", "delete:pool-session",
+        "manage:broadcast", "view:broadcast", "start:blast", "stop:blast",
+        "manage:template", "view:template",
+        "manage:inbox:crm", "view:inbox:crm",
+        "manage:inbox:blaster", "view:inbox:blaster",
+        "manage:inbox:warmup", "view:inbox:warmup",
+        "manage:user", "view:user"
+      ];
+    }
+    return [];
+  };
+
+  const currentUserPermissions = getCurrentUserPermissions();
+  
+  // Check if current user can edit permissions (admin can only grant permissions they have)
+  const canEditPermission = (permission: string) => {
+    if (profile?.role === "superadmin") return true;
+    return currentUserPermissions.includes(permission);
+  };
 
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -225,13 +239,13 @@ const Roles = () => {
                     <span>{selectedRole.name} Permissions</span>
                   </CardTitle>
                    <Button
-                     variant="outline"
-                     size="sm"
-                     onClick={() => setIsEditing(!isEditing)}
-                     className={profile?.role !== "superadmin" ? "hidden" : ""}
-                   >
-                     {isEditing ? "Cancel" : "Edit"}
-                   </Button>
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditing(!isEditing)}
+                      className={!(profile?.role === "superadmin" || profile?.role === "admin") ? "hidden" : ""}
+                    >
+                      {isEditing ? "Cancel" : "Edit"}
+                    </Button>
                 </div>
               </CardHeader>
                <CardContent>
@@ -246,53 +260,111 @@ const Roles = () => {
                        All Permissions Granted
                      </Badge>
                    </div>
-                 ) : profile?.role === "superadmin" ? (
-                   // Superadmin sees full permission management interface
-                   <div className="space-y-6">
-                     {allPermissions.map((group) => (
-                       <div key={group.group}>
-                         <h4 className="font-medium text-foreground mb-3 flex items-center space-x-2">
-                           <Lock className="h-4 w-4" />
-                           <span>{group.group}</span>
-                         </h4>
-                         <div className="grid grid-cols-1 gap-2 ml-6">
-                           {group.permissions.map((permission) => (
-                             <div key={permission} className="flex items-center space-x-2">
-                               <Checkbox
-                                 id={permission}
-                                 checked={hasPermission(selectedRole, permission)}
-                                 disabled={!isEditing}
-                               />
-                               <label
-                                 htmlFor={permission}
-                                 className={`text-sm ${
-                                   hasPermission(selectedRole, permission)
-                                     ? "text-foreground"
-                                     : "text-muted-foreground"
-                                 }`}
-                               >
-                                 {permission.replace(":", " → ").replace("_", " ")}
-                               </label>
-                               {hasPermission(selectedRole, permission) && (
-                                 <Unlock className="h-3 w-3 text-success" />
-                               )}
-                             </div>
-                           ))}
-                         </div>
-                       </div>
-                     ))}
-                     
-                     {isEditing && (
-                       <div className="flex space-x-2 pt-4 border-t">
-                         <Button className="bg-gradient-primary hover:opacity-90" size="sm">
-                           Save Changes
-                         </Button>
-                         <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
-                           Cancel
-                         </Button>
-                       </div>
-                     )}
-                   </div>
+                  ) : profile?.role === "superadmin" ? (
+                    // Superadmin sees full permission management interface
+                    <div className="space-y-6">
+                      {allPermissions.map((group) => (
+                        <div key={group.group}>
+                          <h4 className="font-medium text-foreground mb-3 flex items-center space-x-2">
+                            <Lock className="h-4 w-4" />
+                            <span>{group.group}</span>
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2 ml-6">
+                            {group.permissions.map((permission) => (
+                              <div key={permission} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={permission}
+                                  checked={hasPermission(selectedRole, permission)}
+                                  disabled={!isEditing}
+                                />
+                                <label
+                                  htmlFor={permission}
+                                  className={`text-sm ${
+                                    hasPermission(selectedRole, permission)
+                                      ? "text-foreground"
+                                      : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {permission.replace(":", " → ").replace("_", " ")}
+                                </label>
+                                {hasPermission(selectedRole, permission) && (
+                                  <Unlock className="h-3 w-3 text-success" />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {isEditing && (
+                        <div className="flex space-x-2 pt-4 border-t">
+                          <Button className="bg-gradient-primary hover:opacity-90" size="sm">
+                            Save Changes
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : profile?.role === "admin" ? (
+                    // Admin editing interface - can only edit permissions they have
+                    <div className="space-y-6">
+                      {allPermissions
+                        .filter(group => group.permissions.some(permission => canEditPermission(permission)))
+                        .map((group) => (
+                        <div key={group.group}>
+                          <h4 className="font-medium text-foreground mb-3 flex items-center space-x-2">
+                            <Lock className="h-4 w-4" />
+                            <span>{group.group}</span>
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2 ml-6">
+                            {group.permissions.map((permission) => {
+                              const canEdit = canEditPermission(permission);
+                              return (
+                                <div key={permission} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={permission}
+                                    checked={hasPermission(selectedRole, permission)}
+                                    disabled={!isEditing || !canEdit}
+                                  />
+                                  <label
+                                    htmlFor={permission}
+                                    className={`text-sm ${
+                                      hasPermission(selectedRole, permission)
+                                        ? "text-foreground"
+                                        : canEdit 
+                                          ? "text-muted-foreground" 
+                                          : "text-muted-foreground/50"
+                                    }`}
+                                  >
+                                    {permission.replace(":", " → ").replace("_", " ")}
+                                    {!canEdit && " (tidak tersedia)"}
+                                  </label>
+                                  {hasPermission(selectedRole, permission) && (
+                                    <Unlock className="h-3 w-3 text-success" />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {isEditing && (
+                        <div className="flex space-x-2 pt-4 border-t">
+                          <Button className="bg-gradient-primary hover:opacity-90" size="sm">
+                            Save Changes
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                            Cancel
+                          </Button>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            * Anda hanya dapat memberikan permissions yang Anda miliki (19 permissions)
+                          </p>
+                        </div>
+                      )}
+                    </div>
                  ) : (
                    // Admin and other users only see granted permissions
                    <div className="space-y-6">
