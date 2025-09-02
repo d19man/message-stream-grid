@@ -48,23 +48,48 @@ const Roles = () => {
     },
     {
       id: "3",
-      name: "Provisioning Manager",
+      name: "CRM Admin",
       permissions: [
         "view:session",
-        "view:pool-session", "transfer:pool-session", "delete:pool-session",
-        "view:broadcast", "start:blast", "stop:blast",
-        "view:template",
         "manage:inbox:crm", "view:inbox:crm",
-        "manage:inbox:blaster", "view:inbox:blaster",
-        "manage:inbox:warmup", "view:inbox:warmup",
+        "view:template",
+        "view:broadcast",
         "view:user"
       ],
-      description: "Can manage sessions and pools but cannot create new sessions",
+      description: "CRM system administrator with full CRM access",
       createdAt: "2024-01-05T00:00:00Z",
       updatedAt: "2024-01-10T15:30:00Z",
     },
     {
       id: "4",
+      name: "Blasting Admin",
+      permissions: [
+        "view:session",
+        "manage:broadcast", "view:broadcast", "start:blast", "stop:blast",
+        "manage:inbox:blaster", "view:inbox:blaster",
+        "manage:template", "view:template",
+        "view:user"
+      ],
+      description: "Blasting system administrator with full blasting access",
+      createdAt: "2024-01-08T00:00:00Z",
+      updatedAt: "2024-01-12T09:20:00Z",
+    },
+    {
+      id: "5",
+      name: "Warmup Admin",
+      permissions: [
+        "view:session",
+        "manage:inbox:warmup", "view:inbox:warmup",
+        "view:template",
+        "view:broadcast",
+        "view:user"
+      ],
+      description: "Warmup system administrator with full warmup access",
+      createdAt: "2024-01-10T00:00:00Z",
+      updatedAt: "2024-01-18T14:45:00Z",
+    },
+    {
+      id: "6",
       name: "CRM Operator",
       permissions: [
         "view:session",
