@@ -72,13 +72,14 @@ export const useUsers = () => {
   };
 
   const getUsersByPool = (pool: "CRM" | "BLASTER" | "WARMUP") => {
-    // Filter users based on their role and admin relationship
+    // Filter users based on their role and pool type
     const poolUsers = users.filter(user => {
-      // Return users that are not admin/superadmin (include 'user', 'crm', 'blaster', 'warmup' roles)
-      if (['admin', 'superadmin'].includes(user.role)) return false;
+      // Return users that are not admin/superadmin
+      if (['admin', 'superladmin'].includes(user.role)) return false;
       
-      // Include all non-admin users since we don't have strict pool-specific roles yet
-      return true;
+      // Filter by pool-specific roles
+      const poolRole = pool.toLowerCase(); // "CRM" -> "crm"
+      return user.role === poolRole || user.role === 'user';
     });
     
     console.log(`getUsersByPool(${pool}):`, {
