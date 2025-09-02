@@ -39,23 +39,23 @@ import { ShareSessionDialog } from "@/components/sessions/ShareSessionDialog";
 import { ShareToUserDialog } from "@/components/sessions/ShareToUserDialog";
 
 // Mock current user - in real app, this would come from auth context
-const currentUser: User & { role: Role } = {
+const getCurrentUser = (role: "Super Admin" | "Admin"): User & { role: Role } => ({
   id: "current-user",
   email: "admin@example.com",
   name: "John Smith",
-  roleId: "1",
+  roleId: role === "Super Admin" ? "1" : "2",
   role: {
-    id: "1",
-    name: "Super Admin",
-    permissions: ["*"],
-    description: "Full system access",
+    id: role === "Super Admin" ? "1" : "2",
+    name: role,
+    permissions: role === "Super Admin" ? ["*"] : ["read:pool-session", "create:pool-session", "transfer:pool-session", "delete:pool-session"],
+    description: role === "Super Admin" ? "Full system access" : "Admin access",
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z"
   },
   isActive: true,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z"
-};
+});
 
 // Permission checking utility
 const hasPermission = (user: User & { role: Role }, permission: string): boolean => {
@@ -97,12 +97,15 @@ const PoolSessions = () => {
     }
   ]);
   
+  const [currentUserRole, setCurrentUserRole] = useState<"Super Admin" | "Admin">("Admin");
+  
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; sessionId: string | null; isHardDelete: boolean }>({
     open: false, 
     sessionId: null,
     isHardDelete: false
   });
   
+  const currentUser = getCurrentUser(currentUserRole);
   const { toast } = useToast();
 
   const canCreateSession = hasPermission(currentUser, "create:pool-session");
@@ -230,6 +233,20 @@ const PoolSessions = () => {
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button 
+            variant={currentUserRole === "Super Admin" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCurrentUserRole("Super Admin")}
+          >
+            Super Admin
+          </Button>
+          <Button 
+            variant={currentUserRole === "Admin" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCurrentUserRole("Admin")}
+          >
+            Admin
+          </Button>
           {canCreateSession ? (
             <SessionDialog 
               trigger={
