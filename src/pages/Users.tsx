@@ -514,12 +514,19 @@ const Users = () => {
                               }
                             />
                           )}
-                         {profile?.role === 'superadmin' && (user.role === 'admin' || user.role === 'user') && (
-                           <ChangePasswordDialog 
-                             userId={user.id}
-                             userEmail={user.email}
-                           />
-                         )}
+                          {/* Reset Password - Admin can reset password for their users, Superadmin can reset for admin/user */}
+                          {((profile?.role === 'admin' && user.admin_id === profile?.id && user.role !== 'admin' && user.role !== 'superadmin') || 
+                            (profile?.role === 'superadmin' && user.role !== 'superadmin')) && (
+                            <ChangePasswordDialog 
+                              userId={user.id}
+                              userEmail={user.email}
+                              trigger={
+                                <Button variant="ghost" size="sm" title="Reset Password">
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              }
+                            />
+                          )}
                           {/* Hide delete button for admin viewing their own profile */}
                           {!(user.id === profile?.id && profile?.role === 'admin') && (
                             <Button 
