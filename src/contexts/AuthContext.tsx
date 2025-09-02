@@ -32,6 +32,8 @@ interface AuthContextType {
   canAccessPoolSessions: () => boolean;
   canManageRoles: () => boolean;
   canAccessSettings: () => boolean;
+  canAccessBlasterSessions: () => boolean;
+  canAccessWarmupSessions: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -270,24 +272,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return profile?.role === 'superadmin' || profile?.role === 'admin';
   };
 
+  // CRM role - only CRM specific access
   const canManageSessions = () => {
-    return ['superadmin', 'admin', 'crm', 'blaster', 'warmup'].includes(profile?.role || '');
+    if (profile?.role === 'crm') return true;
+    return ['superadmin', 'admin'].includes(profile?.role || '');
   };
 
   const canManageBroadcast = () => {
-    return ['superadmin', 'admin', 'blaster'].includes(profile?.role || '');
+    if (profile?.role === 'blaster') return true;
+    return ['superadmin', 'admin'].includes(profile?.role || '');
   };
 
   const canManageTemplates = () => {
-    return ['superadmin', 'admin', 'crm', 'blaster'].includes(profile?.role || '');
+    if (profile?.role === 'crm') return true;
+    return ['superadmin', 'admin'].includes(profile?.role || '');
   };
 
   const canManageContacts = () => {
-    return ['superadmin', 'admin', 'crm'].includes(profile?.role || '');
+    if (profile?.role === 'crm') return true;
+    return ['superadmin', 'admin'].includes(profile?.role || '');
   };
 
   const canViewInbox = () => {
-    return ['superadmin', 'admin', 'crm'].includes(profile?.role || '');
+    if (profile?.role === 'crm') return true;
+    return ['superadmin', 'admin'].includes(profile?.role || '');
   };
 
   // Add missing permission functions
@@ -299,8 +307,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return ['superadmin', 'admin'].includes(profile?.role || '');
   };
 
+  // Separate settings access for each role
   const canAccessSettings = () => {
     return ['superadmin', 'admin', 'crm', 'blaster', 'warmup'].includes(profile?.role || '');
+  };
+
+  // Blaster specific permissions
+  const canAccessBlasterSessions = () => {
+    if (profile?.role === 'blaster') return true;
+    return ['superadmin', 'admin'].includes(profile?.role || '');
+  };
+
+  // Warmup specific permissions  
+  const canAccessWarmupSessions = () => {
+    if (profile?.role === 'warmup') return true;
+    return ['superadmin', 'admin'].includes(profile?.role || '');
   };
 
   const value = {
@@ -322,7 +343,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     canViewInbox,
     canAccessPoolSessions,
     canManageRoles,
-    canAccessSettings
+    canAccessSettings,
+    canAccessBlasterSessions,
+    canAccessWarmupSessions
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -88,11 +88,28 @@ const Sidebar = () => {
     canManageContacts,
     canManageUsers,
     canManageRoles,
-    canAccessSettings
+    canAccessSettings,
+    canAccessBlasterSessions,
+    canAccessWarmupSessions
   } = useAuth();
 
-  // Filter navigation based on user permissions
+  // Filter navigation based on user role - each role has completely separate access
   const getFilteredNavigation = () => {
+    const userRole = profile?.role;
+    
+    if (userRole === 'crm') {
+      return navigation.filter(item => ['/sessions', '/inbox', '/templates', '/contacts', '/settings'].includes(item.href));
+    }
+    
+    if (userRole === 'blaster') {
+      return navigation.filter(item => ['/broadcast', '/settings'].includes(item.href));
+    }
+    
+    if (userRole === 'warmup') {
+      return navigation.filter(item => ['/settings'].includes(item.href));
+    }
+    
+    // For superadmin and admin, use permission-based filtering
     return navigation.filter(item => {
       switch (item.href) {
         case "/":
