@@ -44,19 +44,14 @@ const ProfileUpdateDialog: React.FC<ProfileUpdateDialogProps> = ({
       return;
     }
 
-    if (!email.trim()) {
-      setError('Email is required');
-      return;
-    }
-
     setLoading(true);
 
     try {
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: fullName.trim(),
-          email: email.trim()
+          full_name: fullName.trim()
+          // Email should match auth.users email, not be editable
         })
         .eq('id', profile?.id);
 
@@ -152,12 +147,13 @@ const ProfileUpdateDialog: React.FC<ProfileUpdateDialogProps> = ({
             <Input
               id="email"
               type="email"
-              placeholder="Enter your email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading || Boolean(success)}
+              disabled={true}
+              className="bg-muted"
             />
+            <p className="text-xs text-muted-foreground">
+              Email cannot be changed as it's linked to your authentication
+            </p>
           </div>
           
           {!success && (
