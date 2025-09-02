@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Share, Crown, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { User } from "@/types";
+import { useUsers } from "@/hooks/useUsers";
 
 interface ShareSessionDialogProps {
   trigger?: React.ReactNode;
@@ -16,21 +16,17 @@ interface ShareSessionDialogProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-// Mock admin users
-const mockAdmins: User[] = [
-  { id: "admin1", email: "admin1@example.com", name: "Sarah Manager", roleId: "admin", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-  { id: "admin2", email: "admin2@example.com", name: "Mike Supervisor", roleId: "admin", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-  { id: "admin3", email: "admin3@example.com", name: "Lisa Leader", roleId: "admin", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-];
-
 export const ShareSessionDialog = ({ trigger, sessionName, onShare, open: controlledOpen, onOpenChange }: ShareSessionDialogProps) => {
   const [internalOpen, setInternalOpen] = useState(false);
   const [selectedAdminId, setSelectedAdminId] = useState("");
   const { toast } = useToast();
+  const { getAdmins } = useUsers();
 
   // Use controlled or internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
+
+  const admins = getAdmins();
 
   const handleShare = () => {
     if (!selectedAdminId) {
@@ -42,13 +38,13 @@ export const ShareSessionDialog = ({ trigger, sessionName, onShare, open: contro
       return;
     }
 
-    const selectedAdmin = mockAdmins.find(admin => admin.id === selectedAdminId);
+    const selectedAdmin = admins.find(admin => admin.id === selectedAdminId);
     onShare?.(selectedAdminId);
     setOpen(false);
     
     toast({
       title: "Session Shared",
-      description: `"${sessionName}" has been shared with ${selectedAdmin?.name}`,
+      description: `"${sessionName}" has been shared with ${selectedAdmin?.full_name || selectedAdmin?.email}`,
     });
 
     setSelectedAdminId("");
@@ -86,18 +82,18 @@ export const ShareSessionDialog = ({ trigger, sessionName, onShare, open: contro
                 <SelectValue placeholder="Choose an admin to share with" />
               </SelectTrigger>
               <SelectContent>
-                {mockAdmins.map((admin) => (
+                {admins.map((admin) => (
                   <SelectItem key={admin.id} value={admin.id}>
                     <div className="flex items-center space-x-2">
                       <Avatar className="h-6 w-6">
                         <AvatarFallback className="text-xs">
-                          {admin.name.split(' ').map(n => n[0]).join('')}
+                          {(admin.full_name || admin.email).split(' ').map(n => n[0]).join('').toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <div className="font-medium">{admin.name}</div>
-                        <div className="text-xs text-muted-foreground">{admin.email}</div>
-                      </div>
+                        <div>
+                          <div className="font-medium">{admin.full_name || admin.email}</div>
+                          <div className="text-xs text-muted-foreground">{admin.email}</div>
+                        </div>
                       <Shield className="h-3 w-3 text-blue-500 ml-auto" />
                     </div>
                   </SelectItem>

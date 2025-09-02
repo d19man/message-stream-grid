@@ -70,6 +70,48 @@ export type Database = {
           },
         ]
       }
+      sessions: {
+        Row: {
+          admin_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          last_seen: string | null
+          name: string
+          phone: string | null
+          pool: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_seen?: string | null
+          name: string
+          phone?: string | null
+          pool: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_seen?: string | null
+          name?: string
+          phone?: string | null
+          pool?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_api_keys: {
         Row: {
           created_at: string

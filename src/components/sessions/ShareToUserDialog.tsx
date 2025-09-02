@@ -7,7 +7,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Users, Smartphone, Zap, Wifi } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { User, PoolType } from "@/types";
+import { useUsers } from "@/hooks/useUsers";
+import type { PoolType } from "@/types";
 
 interface ShareToUserDialogProps {
   trigger?: React.ReactNode;
@@ -18,27 +19,18 @@ interface ShareToUserDialogProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-// Mock users with specific roles
-const mockTeamUsers: (User & { poolRole: PoolType })[] = [
-  { id: "user1", email: "alice@example.com", name: "Alice Johnson", roleId: "user", poolRole: "CRM", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-  { id: "user2", email: "bob@example.com", name: "Bob Wilson", roleId: "user", poolRole: "CRM", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-  { id: "user3", email: "carol@example.com", name: "Carol Davis", roleId: "user", poolRole: "BLASTER", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-  { id: "user4", email: "david@example.com", name: "David Brown", roleId: "user", poolRole: "BLASTER", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-  { id: "user5", email: "eve@example.com", name: "Eve Miller", roleId: "user", poolRole: "BLASTER", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-  { id: "user6", email: "frank@example.com", name: "Frank Wilson", roleId: "user", poolRole: "WARMUP", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-];
-
 export const ShareToUserDialog = ({ trigger, sessionName, sessionPool, onShare, open: controlledOpen, onOpenChange }: ShareToUserDialogProps) => {
   const [internalOpen, setInternalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const { toast } = useToast();
+  const { getUsersByPool } = useUsers();
 
   // Use controlled or internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
 
-  // Filter users by pool role
-  const availableUsers = mockTeamUsers.filter(user => user.poolRole === sessionPool);
+  // Filter users by pool role - for now, get all regular users
+  const availableUsers = getUsersByPool(sessionPool);
 
   const handleShare = () => {
     if (!selectedUserId) {
@@ -56,7 +48,7 @@ export const ShareToUserDialog = ({ trigger, sessionName, sessionPool, onShare, 
     
     toast({
       title: "Session Assigned",
-      description: `"${sessionName}" has been assigned to ${selectedUser?.name}`,
+      description: `"${sessionName}" has been assigned to ${selectedUser?.full_name || selectedUser?.email}`,
     });
 
     setSelectedUserId("");
@@ -122,15 +114,15 @@ export const ShareToUserDialog = ({ trigger, sessionName, sessionPool, onShare, 
                       <div className="flex items-center space-x-2">
                         <Avatar className="h-6 w-6">
                           <AvatarFallback className="text-xs">
-                            {user.name.split(' ').map(n => n[0]).join('')}
+                            {(user.full_name || user.email).split(' ').map(n => n[0]).join('').toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className="font-medium">{user.name}</div>
+                          <div className="font-medium">{user.full_name || user.email}</div>
                           <div className="text-xs text-muted-foreground">{user.email}</div>
                         </div>
                         <Badge variant="outline" className="text-xs ml-auto">
-                          {user.poolRole}
+                          {user.role}
                         </Badge>
                       </div>
                     </SelectItem>

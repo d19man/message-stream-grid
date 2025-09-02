@@ -20,6 +20,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { useSessions, Session } from "@/hooks/useSessions";
+import { useUsers } from "@/hooks/useUsers";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Plus, 
   MoreHorizontal, 
@@ -31,128 +34,63 @@ import {
   ShieldAlert,
   Info,
   ArrowRightLeft,
-  Crown
+  Crown,
+  Loader2
 } from "lucide-react";
-import type { Session, PoolType, User, Role } from "@/types";
+import type { PoolType } from "@/types";
 import { SessionDialog } from "@/components/sessions/SessionDialog";
 import { ShareSessionDialog } from "@/components/sessions/ShareSessionDialog";
 import { ShareToUserDialog } from "@/components/sessions/ShareToUserDialog";
 
-// Mock current user - in real app, this would come from auth context
-const getCurrentUser = (role: "Super Admin" | "Admin" | "CRM" | "Blaster" | "Warmup"): User & { role: Role } => ({
-  id: "current-user",
-  email: "admin@example.com",
-  name: "John Smith",
-  roleId: role === "Super Admin" ? "1" : role === "Admin" ? "2" : "3",
-  role: {
-    id: role === "Super Admin" ? "1" : role === "Admin" ? "2" : "3",
-    name: role,
-    permissions: role === "Super Admin" ? ["*"] : 
-                role === "Admin" ? ["read:pool-session", "create:pool-session", "transfer:pool-session", "delete:pool-session"] :
-                ["read:pool-session"],
-    description: role === "Super Admin" ? "Full system access" : 
-                role === "Admin" ? "Admin access" : 
-                `${role} user access`,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z"
-  },
-  isActive: true,
-  createdAt: "2024-01-01T00:00:00Z",
-  updatedAt: "2024-01-01T00:00:00Z"
-});
-
-// Permission checking utility
-const hasPermission = (user: User & { role: Role }, permission: string): boolean => {
-  if (user.role.permissions.includes("*")) return true;
-  return user.role.permissions.includes(permission);
-};
-
-// Mock users for assignment
-const mockUsers: User[] = [
-  { id: "user1", email: "user1@example.com", name: "Alice Johnson", roleId: "2", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-  { id: "user2", email: "user2@example.com", name: "Bob Wilson", roleId: "3", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-  { id: "user3", email: "user3@example.com", name: "Carol Davis", roleId: "2", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-];
-
 const PoolSessions = () => {
-  const [currentUserRole, setCurrentUserRole] = useState<"Super Admin" | "Admin" | "CRM" | "Blaster" | "Warmup">("Super Admin");
+  const { user, profile } = useAuth();
+  const { sessions, loading: sessionsLoading, createSession, deleteSession, shareToAdmin, assignToUser, clearDistribution } = useSessions();
+  const { users, loading: usersLoading, getAdmins, getUsersByPool, getUserName } = useUsers();
+  const { toast } = useToast();
   
-  const [sessions, setSessions] = useState<Session[]>([
-    {
-      id: "ps1",
-      name: "CRM Session - Alice",
-      pool: "CRM",
-      status: "connected",
-      phone: "+1234567890",
-      lastSeen: "2 minutes ago",
-      userId: "user1",
-      createdAt: "2024-01-15T10:00:00Z",
-      updatedAt: "2024-01-15T10:00:00Z"
-    },
-    {
-      id: "ps2", 
-      name: "Blaster Session - Bob",
-      pool: "BLASTER",
-      status: "disconnected",
-      phone: "+1987654321",
-      lastSeen: "1 hour ago",
-      userId: "user2",
-      createdAt: "2024-01-15T09:00:00Z",
-      updatedAt: "2024-01-15T09:00:00Z"
-    }
-  ]);
-  
+  const [selectedSessionForAssignment, setSelectedSessionForAssignment] = useState<Session | null>(null);
+  const [selectedSessionForSharing, setSelectedSessionForSharing] = useState<Session | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; sessionId: string | null; isHardDelete: boolean }>({
     open: false, 
     sessionId: null,
     isHardDelete: false
   });
-  
-  const [selectedSessionForAssignment, setSelectedSessionForAssignment] = useState<Session | null>(null);
-  const [selectedSessionForSharing, setSelectedSessionForSharing] = useState<Session | null>(null);
-  
-  const currentUser = getCurrentUser(currentUserRole);
-  
+
   // Get available pools based on user role
   const getAvailablePools = (): PoolType[] => {
-    if (currentUser.role.name === "Super Admin" || currentUser.role.name === "Admin") {
+    if (!profile) return ["CRM"];
+    
+    if (profile.role === "superadmin" || profile.role === "admin") {
       return ["CRM", "BLASTER", "WARMUP"];
     }
-    // Regular users only see their specific pool
-    return [currentUser.role.name as PoolType];
+    // Regular users see all pools for now - could be customized later
+    return ["CRM", "BLASTER", "WARMUP"];
   };
 
   const availablePools = getAvailablePools();
   const [activeTab, setActiveTab] = useState<PoolType>(availablePools[0] || "CRM");
-  
-  const { toast } = useToast();
 
-  const canCreateSession = hasPermission(currentUser, "create:pool-session");
-  const canTransferSession = hasPermission(currentUser, "transfer:pool-session");
-  const canDeleteSession = hasPermission(currentUser, "delete:pool-session");
-  const canPurgeSession = hasPermission(currentUser, "purge:pool-session");
+  // Permission checks
+  const canCreateSession = profile?.role === "superadmin";
+  const canDeleteSession = profile?.role === "superadmin" || profile?.role === "admin";
+  const canPurgeSession = profile?.role === "superadmin";
 
-  const handleSaveSession = (sessionData: Partial<Session>) => {
-    const newSession: Session = {
-      id: `ps${Date.now()}`,
+  const handleSaveSession = async (sessionData: Partial<Session>) => {
+    const result = await createSession({
       name: sessionData.name || "New Session",
       pool: sessionData.pool || activeTab,
-      status: "disconnected",
-      phone: "",
-      lastSeen: "Never",
-      userId: sessionData.userId || mockUsers[0].id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    setSessions(prev => [...prev, newSession]);
-    toast({
-      title: "Session Created",
-      description: `Pool session "${newSession.name}" has been created and assigned.`
+      user_id: sessionData.user_id
     });
+    
+    if (result) {
+      toast({
+        title: "Session Created",
+        description: `Session "${result.name}" has been created.`
+      });
+    }
   };
 
-  const handleDeleteSession = (sessionId: string, isHardDelete = false) => {
+  const handleDeleteSession = async (sessionId: string, isHardDelete = false) => {
     if (isHardDelete && !canPurgeSession) {
       toast({
         title: "Permission Denied",
@@ -171,69 +109,48 @@ const PoolSessions = () => {
       return;
     }
 
-    setSessions(prev => prev.filter(s => s.id !== sessionId));
-    setDeleteDialog({ open: false, sessionId: null, isHardDelete: false });
-    
-    toast({
-      title: isHardDelete ? "Session Purged" : "Session Deleted",
-      description: `Session has been ${isHardDelete ? 'permanently removed' : 'soft deleted'}.`
-    });
-  };
-
-  const handleTransferSession = (sessionId: string) => {
-    if (!canTransferSession) {
-      toast({
-        title: "Permission Denied",
-        description: "You don't have permission to transfer sessions.",
-        variant: "destructive"
-      });
-      return;
+    const success = await deleteSession(sessionId);
+    if (success) {
+      setDeleteDialog({ open: false, sessionId: null, isHardDelete: false });
     }
-    
-    toast({
-      title: "Transfer Session",
-      description: "Transfer functionality would be implemented here."
-    });
   };
 
-  const handleClearDistribution = (sessionId: string) => {
-    const session = sessions.find(s => s.id === sessionId);
-    if (!session) return;
-
-    // Reset session assignment
-    setSessions(prev => prev.map(s => 
-      s.id === sessionId 
-        ? { ...s, userId: "", status: "disconnected", phone: "", lastSeen: "Never" }
-        : s
-    ));
-
-    toast({
-      title: "Distribution Cleared",
-      description: `Session "${session.name}" has been cleared and is ready for admin distribution.`
-    });
+  const handleClearDistribution = async (sessionId: string) => {
+    const result = await clearDistribution(sessionId);
+    if (result) {
+      toast({
+        title: "Distribution Cleared",
+        description: `Session "${result.name}" has been cleared and is ready for admin distribution.`
+      });
+    }
   };
 
-  const handleAssignToUser = (userId: string) => {
+  const handleAssignToUser = async (userId: string) => {
     if (!selectedSessionForAssignment) return;
 
-    setSessions(prev => prev.map(s => 
-      s.id === selectedSessionForAssignment.id 
-        ? { ...s, userId: userId }
-        : s
-    ));
+    const result = await assignToUser(selectedSessionForAssignment.id, userId);
+    if (result) {
+      const userName = getUserName(userId);
+      toast({
+        title: "Session Assigned",
+        description: `"${result.name}" has been assigned to ${userName}`,
+      });
+    }
 
     setSelectedSessionForAssignment(null);
   };
 
-  const handleShareToAdmin = (adminId: string) => {
+  const handleShareToAdmin = async (adminId: string) => {
     if (!selectedSessionForSharing) return;
 
-    // Here you would send the session to the selected admin
-    // For now, we'll just show a toast
-    toast({
-      title: "Session Shared to Admin",
-      description: `"${selectedSessionForSharing.name}" has been shared to admin storage`,
-    });
+    const result = await shareToAdmin(selectedSessionForSharing.id, adminId);
+    if (result) {
+      const adminName = getUserName(adminId);
+      toast({
+        title: "Session Shared to Admin",
+        description: `"${result.name}" has been shared to ${adminName}`,
+      });
+    }
 
     setSelectedSessionForSharing(null);
   };
@@ -254,17 +171,24 @@ const PoolSessions = () => {
     }
   };
 
-  const getUserName = (userId: string) => {
-    const user = mockUsers.find(u => u.id === userId);
-    return user?.name || "Unknown User";
-  };
-
   const filteredSessions = sessions.filter(session => session.pool === activeTab);
   const poolStats = {
     CRM: sessions.filter(s => s.pool === "CRM"),
     BLASTER: sessions.filter(s => s.pool === "BLASTER"), 
     WARMUP: sessions.filter(s => s.pool === "WARMUP")
   };
+
+  // Show loading state
+  if (sessionsLoading || usersLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading sessions...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -277,41 +201,6 @@ const PoolSessions = () => {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button 
-            variant={currentUserRole === "Super Admin" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setCurrentUserRole("Super Admin")}
-          >
-            Super Admin
-          </Button>
-          <Button 
-            variant={currentUserRole === "Admin" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setCurrentUserRole("Admin")}
-          >
-            Admin
-          </Button>
-          <Button 
-            variant={currentUserRole === "CRM" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setCurrentUserRole("CRM")}
-          >
-            CRM User
-          </Button>
-          <Button 
-            variant={currentUserRole === "Blaster" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setCurrentUserRole("Blaster")}
-          >
-            Blaster User
-          </Button>
-          <Button 
-            variant={currentUserRole === "Warmup" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setCurrentUserRole("Warmup")}
-          >
-            Warmup User
-          </Button>
           {canCreateSession ? (
             <SessionDialog 
               trigger={
@@ -401,7 +290,7 @@ const PoolSessions = () => {
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Reconnect
                           </DropdownMenuItem>
-                          {currentUser.role.name === "Super Admin" && (
+                          {profile?.role === "superadmin" && (
                             <>
                               <DropdownMenuItem 
                                 onClick={() => {
@@ -417,10 +306,9 @@ const PoolSessions = () => {
                               </DropdownMenuItem>
                             </>
                           )}
-                          {currentUser.role.name === "Admin" && (
+                          {profile?.role === "admin" && (
                             <DropdownMenuItem 
                               onClick={() => {
-                                // We'll handle this with a separate state
                                 setSelectedSessionForAssignment(session);
                               }}
                             >
@@ -457,7 +345,7 @@ const PoolSessions = () => {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Assigned to</span>
-                          <span className="text-sm font-medium">{getUserName(session.userId)}</span>
+                          <span className="text-sm font-medium">{getUserName(session.user_id || "")}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Phone</span>
@@ -465,7 +353,7 @@ const PoolSessions = () => {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Last seen</span>
-                          <span className="text-sm">{session.lastSeen}</span>
+                          <span className="text-sm">{session.last_seen}</span>
                         </div>
                       </div>
                     </CardContent>
