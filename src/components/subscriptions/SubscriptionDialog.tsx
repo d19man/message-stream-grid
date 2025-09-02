@@ -23,6 +23,8 @@ interface SubscriptionDialogProps {
   user: User;
   trigger?: React.ReactNode;
   onSuccess: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 type SubscriptionType = 'lifetime' | 'trial_1_day' | 'trial_3_days' | 'trial_5_days' | '1_month' | '2_months' | '3_months' | '6_months' | '1_year';
@@ -39,13 +41,23 @@ const subscriptionOptions = [
   { value: '1_year', label: '1 Year', duration: 365 },
 ];
 
-const SubscriptionDialog: React.FC<SubscriptionDialogProps> = ({ user, trigger, onSuccess }) => {
+const SubscriptionDialog: React.FC<SubscriptionDialogProps> = ({ 
+  user, 
+  trigger, 
+  onSuccess, 
+  open: controlledOpen, 
+  onOpenChange: controlledOnOpenChange 
+}) => {
   const [subscriptionType, setSubscriptionType] = useState<SubscriptionType | ''>('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const { toast } = useToast();
+
+  // Use controlled state if provided, otherwise use internal state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = controlledOnOpenChange || setInternalOpen;
 
   const calculateEndDate = (type: SubscriptionType): Date | null => {
     if (type === 'lifetime') return null;
@@ -152,14 +164,11 @@ const SubscriptionDialog: React.FC<SubscriptionDialogProps> = ({ user, trigger, 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" size="sm">
-            <Calendar className="w-4 h-4 mr-2" />
-            Manage Subscription
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger && (
+        <DialogTrigger asChild>
+          {trigger}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">

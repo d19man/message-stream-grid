@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import SubscriptionDialog from '@/components/subscriptions/SubscriptionDialog';
+import UserCreateDialog from '@/components/users/UserCreateDialog';
 
 interface User {
   id: string;
@@ -198,10 +199,7 @@ const Users = () => {
           <p className="text-muted-foreground">Manage system users and their subscriptions</p>
         </div>
         {isSuperAdmin && (
-          <Button onClick={() => window.location.href = '/login'} className="bg-gradient-primary">
-            <Plus className="w-4 h-4 mr-2" />
-            Create User
-          </Button>
+          <UserCreateDialog onSuccess={fetchUsers} />
         )}
       </div>
 
