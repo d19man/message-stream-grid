@@ -193,9 +193,6 @@ export const SearchDialog = () => {
             <Search className="h-5 w-5" />
             <span>Search</span>
           </DialogTitle>
-          <DialogDescription>
-            Search through templates, contacts, sessions, and campaigns quickly.
-          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
