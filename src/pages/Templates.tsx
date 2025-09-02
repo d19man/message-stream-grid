@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,101 +16,159 @@ import {
 } from "lucide-react";
 import { TemplateDialog } from "@/components/templates/TemplateDialog";
 import { TemplatePreviewDialog } from "@/components/templates/TemplatePreviewDialog";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import type { Template, TemplateKind, PoolType } from "@/types";
 
 const Templates = () => {
+  const { toast } = useToast();
+  const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState<TemplateKind>("text");
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - replace with API call
-  const getMockTemplates = (): Template[] => [
-    {
-      id: "1",
-      name: "Welcome Message",
-      kind: "text",
-      allowedIn: ["CRM", "WARMUP"],
-      contentJson: {
-        text: "Hello {{name}}! Welcome to our service. How can we help you today?"
-      },
-      preview: "Hello John! Welcome to our service. How can we help you today?",
-      userId: "user1",
-      createdAt: "2024-01-15T10:00:00Z",
-      updatedAt: "2024-01-15T10:00:00Z",
-    },
-    {
-      id: "2",
-      name: "Product Promotion",
-      kind: "image",
-      allowedIn: ["BLASTER"],
-      contentJson: {
-        caption: "🔥 MEGA SALE ALERT! Get {{discount}}% off on all products!",
-        mediaUrl: "/api/uploads/promo-image.jpg"
-      },
-      preview: "🔥 MEGA SALE ALERT! Get 50% off on all products!",
-      userId: "user1",
-      createdAt: "2024-01-15T09:00:00Z",
-      updatedAt: "2024-01-15T09:00:00Z",
-    },
-    {
-      id: "3",
-      name: "Voice Greeting",
-      kind: "audio",
-      allowedIn: ["CRM"],
-      contentJson: {
-        mediaUrl: "/api/uploads/greeting.mp3",
-        caption: "Listen to our special message!"
-      },
-      preview: "🎵 Voice message: Listen to our special message!",
-      userId: "user1",
-      createdAt: "2024-01-15T08:00:00Z",
-      updatedAt: "2024-01-15T08:00:00Z",
-    },
-    {
-      id: "4",
-      name: "Quick Actions Menu",
-      kind: "button",
-      allowedIn: ["CRM", "BLASTER"],
-      contentJson: {
-        text: "How can we help you today?",
-        buttons: [
-          { id: "1", text: "📦 Track Order" },
-          { id: "2", text: "💬 Support" },
-          { id: "3", text: "📋 Catalog" }
-        ]
-      },
-      preview: "How can we help you today?\n[📦 Track Order] [💬 Support] [📋 Catalog]",
-      userId: "user1",
-      createdAt: "2024-01-15T07:00:00Z",
-      updatedAt: "2024-01-15T07:00:00Z",
-    },
-  ];
-
-  const [templates, setTemplates] = useState<Template[]>(getMockTemplates());
-
-  const handleSaveTemplate = (templateData: Partial<Template>) => {
-    if (templateData.id) {
-      // Edit existing template
-      setTemplates(prev => prev.map(t => 
-        t.id === templateData.id ? { ...t, ...templateData, updatedAt: new Date().toISOString() } : t
-      ));
-    } else {
-      // Create new template
-      const newTemplate: Template = {
-        id: Date.now().toString(),
-        name: templateData.name!,
-        kind: templateData.kind!,
-        allowedIn: templateData.allowedIn!,
-        contentJson: templateData.contentJson!,
-        preview: generatePreview(templateData.kind!, templateData.contentJson!),
-        userId: "user1",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setTemplates(prev => [...prev, newTemplate]);
+  // Filter available pools based on user role
+  const getAvailablePools = (): PoolType[] => {
+    if (!profile?.role) return ["CRM"];
+    
+    switch (profile.role) {
+      case 'crm':
+        return ["CRM"];
+      case 'blaster':
+        return ["BLASTER"];
+      case 'warmup':
+        return ["WARMUP"];
+      case 'admin':
+      case 'superadmin':
+        return ["CRM", "BLASTER", "WARMUP"];
+      default:
+        return ["CRM"];
     }
   };
 
-  const handleDeleteTemplate = (id: string) => {
-    setTemplates(prev => prev.filter(t => t.id !== id));
+  // Fetch templates from database
+  const fetchTemplates = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      let query = supabase.from('templates').select('*');
+
+      // Apply role-based filtering
+      if (profile?.role === 'superadmin') {
+        // Superadmin sees all templates
+      } else if (profile?.role === 'admin') {
+        // Admin sees their own and their users' templates
+        query = query.or(`user_id.eq.${user.id},admin_id.eq.${user.id}`);
+      } else {
+        // Regular users see only their own templates
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching templates:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load templates",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setTemplates((data as Template[]) || []);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load templates",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user && profile?.role) {
+      fetchTemplates();
+    }
+  }, [user?.id, profile?.role]);
+
+  const handleSaveTemplate = async (templateData: Partial<Template>) => {
+    if (!user) return;
+
+    try {
+        const templatePayload: any = {
+          ...templateData,
+          user_id: templateData.user_id || user.id,
+          admin_id: profile?.admin_id || (profile?.role === 'admin' ? user.id : null),
+          preview: templateData.preview || generatePreview(templateData.kind!, templateData.content_json!),
+        };
+
+      if (templateData.id) {
+        // Update existing template
+        const { error } = await supabase
+          .from('templates')
+          .update(templatePayload)
+          .eq('id', templateData.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Template updated successfully!",
+        });
+      } else {
+        // Create new template
+        const { error } = await supabase
+          .from('templates')
+          .insert([templatePayload]);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success", 
+          description: "Template created successfully!",
+        });
+      }
+
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error saving template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save template",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('templates')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Template deleted successfully!",
+      });
+
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      toast({
+        title: "Error", 
+        description: "Failed to delete template",
+        variant: "destructive",
+      });
+    }
   };
 
   const generatePreview = (kind: TemplateKind, contentJson: any): string => {
@@ -121,19 +179,21 @@ const Templates = () => {
           return examples[key] || `{{${key}}}`;
         }) || "";
       case "image":
-        return contentJson.caption || "📷 Image message";
+      case "text_image":
+        return contentJson.text || contentJson.caption || "📷 Image message";
       case "audio":
         return "🎵 " + (contentJson.caption || "Audio message");
       case "button":
+      case "text_button":
         const text = contentJson.text || "";
-        const buttons = contentJson.buttons?.map((b: any) => `[${b.text}]`).join(" ") || "";
+        const buttons = contentJson.tombolList?.map((b: any) => `[${b.title}]`).join(" ") || "";
         return `${text}${buttons ? "\n" + buttons : ""}`;
       case "image_text_button":
         const imageText = contentJson.text?.replace(/\{\{(\w+)\}\}/g, (_, key) => {
           const examples: Record<string, string> = { name: "John", company: "Acme Corp" };
           return examples[key] || `{{${key}}}`;
         }) || "";
-        const imageButtons = contentJson.buttons?.map((b: any) => `[${b.text}]`).join(" ") || "";
+        const imageButtons = contentJson.tombolList?.map((b: any) => `[${b.title}]`).join(" ") || "";
         return `📷 Image\n${imageText}${imageButtons ? "\n" + imageButtons : ""}`;
       default:
         return "Template preview";
@@ -145,10 +205,12 @@ const Templates = () => {
       case "text":
         return <FileText className="h-4 w-4" />;
       case "image":
+      case "text_image":
         return <Image className="h-4 w-4" />;
       case "audio":
         return <Mic className="h-4 w-4" />;
       case "button":
+      case "text_button":
         return <Square className="h-4 w-4" />;
       case "image_text_button":
         return <Layers className="h-4 w-4" />;
@@ -171,10 +233,22 @@ const Templates = () => {
   const templateCounts = {
     text: templates.filter(t => t.kind === "text").length,
     image: templates.filter(t => t.kind === "image").length,
+    text_image: templates.filter(t => t.kind === "text_image").length,
     audio: templates.filter(t => t.kind === "audio").length,
     button: templates.filter(t => t.kind === "button").length,
+    text_button: templates.filter(t => t.kind === "text_button").length,
     image_text_button: templates.filter(t => t.kind === "image_text_button").length,
   };
+
+  const availablePools = getAvailablePools();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -182,14 +256,21 @@ const Templates = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Templates</h1>
-          <p className="text-muted-foreground">Manage your message templates for different pools</p>
+          <p className="text-muted-foreground">
+            {profile?.role === 'superadmin' 
+              ? 'Manage all message templates across pools'
+              : profile?.role === 'admin'
+              ? 'Manage message templates for your teams'
+              : `Manage your ${availablePools.join(', ')} message templates`
+            }
+          </p>
         </div>
         <TemplateDialog onSave={handleSaveTemplate} />
       </div>
 
       {/* Template Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TemplateKind)}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="text" className="flex items-center space-x-2">
             <FileText className="h-4 w-4" />
             <span>Text ({templateCounts.text})</span>
@@ -197,6 +278,10 @@ const Templates = () => {
           <TabsTrigger value="image" className="flex items-center space-x-2">
             <Image className="h-4 w-4" />
             <span>Image ({templateCounts.image})</span>
+          </TabsTrigger>
+          <TabsTrigger value="text_image" className="flex items-center space-x-2">
+            <Image className="h-4 w-4" />
+            <span>Text+Image ({templateCounts.text_image})</span>
           </TabsTrigger>
           <TabsTrigger value="audio" className="flex items-center space-x-2">
             <Mic className="h-4 w-4" />
@@ -206,23 +291,27 @@ const Templates = () => {
             <Square className="h-4 w-4" />
             <span>Button ({templateCounts.button})</span>
           </TabsTrigger>
+          <TabsTrigger value="text_button" className="flex items-center space-x-2">
+            <Square className="h-4 w-4" />
+            <span>Text+Button ({templateCounts.text_button})</span>
+          </TabsTrigger>
           <TabsTrigger value="image_text_button" className="flex items-center space-x-2">
             <Layers className="h-4 w-4" />
-            <span>Image+Text+Button ({templateCounts.image_text_button})</span>
+            <span>Full ({templateCounts.image_text_button})</span>
           </TabsTrigger>
         </TabsList>
 
-        {["text", "image", "audio", "button", "image_text_button"].map((kind) => (
+        {["text", "image", "text_image", "audio", "button", "text_button", "image_text_button"].map((kind) => (
           <TabsContent key={kind} value={kind} className="space-y-4">
             {filteredTemplates.length === 0 ? (
               <Card className="shadow-card">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   {getKindIcon(kind as TemplateKind)}
                   <h3 className="text-lg font-semibold text-foreground mb-2 mt-4">
-                    No {kind} templates
+                    No {kind.replace('_', ' ')} templates
                   </h3>
                   <p className="text-muted-foreground text-center mb-4">
-                    Create your first {kind} template to get started
+                    Create your first {kind.replace('_', ' ')} template to get started
                   </p>
                   <Button className="bg-gradient-primary hover:opacity-90">
                     <TemplateDialog 
@@ -230,7 +319,7 @@ const Templates = () => {
                       trigger={
                         <div className="flex items-center">
                           <Plus className="h-4 w-4 mr-2" />
-                          Create {kind} template
+                          Create {kind.replace('_', ' ')} template
                         </div>
                       }
                     />
@@ -276,7 +365,7 @@ const Templates = () => {
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {template.allowedIn.map((pool) => (
+                        {template.allowed_in.map((pool) => (
                           <Badge
                             key={pool}
                             variant="secondary"
@@ -292,11 +381,19 @@ const Templates = () => {
                       <div className="bg-muted rounded-lg p-3 mb-4">
                         <p className="text-sm text-muted-foreground mb-1">Preview:</p>
                         <div className="text-sm">
-                          {template.kind === "image" && (
+                          {(template.kind === "image" || template.kind === "text_image" || template.kind === "image_text_button") && (
                             <div className="mb-2">
-                              <div className="w-full h-24 bg-gradient-accent rounded flex items-center justify-center">
-                                <Image className="h-6 w-6 text-muted-foreground" />
-                              </div>
+                              {template.content_json.imagePath ? (
+                                <img 
+                                  src={template.content_json.imagePath} 
+                                  alt="Template preview"
+                                  className="w-full h-24 object-cover rounded"
+                                />
+                              ) : (
+                                <div className="w-full h-24 bg-gradient-accent rounded flex items-center justify-center">
+                                  <Image className="h-6 w-6 text-muted-foreground" />
+                                </div>
+                              )}
                             </div>
                           )}
                           {template.kind === "audio" && (
@@ -309,6 +406,15 @@ const Templates = () => {
                             </div>
                           )}
                           <p className="whitespace-pre-wrap">{template.preview}</p>
+                          {template.content_json.tombolList && template.content_json.tombolList.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {template.content_json.tombolList.map((button: any, index: number) => (
+                                <div key={index} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                                  🔗 {button.title}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -316,15 +422,15 @@ const Templates = () => {
                       <div className="space-y-2 text-sm">
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground">Type:</span>
-                          <span className="capitalize">{template.kind}</span>
+                          <span className="capitalize">{template.kind.replace('_', ' ')}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground">Pools:</span>
-                          <span>{template.allowedIn.length}</span>
+                          <span>{template.allowed_in.length}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground">Updated:</span>
-                          <span>{new Date(template.updatedAt).toLocaleDateString()}</span>
+                          <span>{new Date(template.updated_at).toLocaleDateString()}</span>
                         </div>
                       </div>
                     </CardContent>

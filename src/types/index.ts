@@ -47,18 +47,19 @@ export interface Contact {
   updatedAt: string;
 }
 
-export type TemplateKind = 'text' | 'image' | 'audio' | 'button' | 'image_text_button';
+export type TemplateKind = "text" | "image" | "audio" | "button" | "text_button" | "text_image" | "image_text_button";
 
 export interface Template {
   id: string;
   name: string;
   kind: TemplateKind;
-  allowedIn: PoolType[];
-  contentJson: any;
+  allowed_in: PoolType[];
+  content_json: any;
   preview?: string;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
+  user_id?: string;
+  admin_id?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export type BroadcastStatus = 'draft' | 'queued' | 'running' | 'paused' | 'completed' | 'failed';
@@ -67,11 +68,11 @@ export interface BroadcastJob {
   id: string;
   name: string;
   pool: PoolType;
-  templateId: string;
+  template_id: string;
   template?: Template;
-  targetContacts: string[];
+  target_contacts: string[];
   status: BroadcastStatus;
-  planJson: {
+  plan_json: {
     delayMin: number;
     delayMax: number;
     sessions: string[];
@@ -87,11 +88,12 @@ export interface BroadcastJob {
     failed: number;
     pending: number;
   };
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
-  startedAt?: string;
-  completedAt?: string;
+  user_id?: string;
+  admin_id?: string;
+  created_at: string;
+  updated_at: string;
+  started_at?: string;
+  completed_at?: string;
 }
 
 export interface BroadcastLog {

@@ -47,17 +47,17 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
       setFormData({
         name: editingCampaign.name,
         pool: editingCampaign.pool,
-        templateId: editingCampaign.templateId,
-        targetContacts: editingCampaign.targetContacts || [],
+        template_id: editingCampaign.template_id,
+        target_contacts: editingCampaign.target_contacts || [],
         manualPhones: [],
         manualPhoneText: "",
         selectedTags: [],
-        delayMin: editingCampaign.planJson.delayMin,
-        delayMax: editingCampaign.planJson.delayMax,
-        sessions: editingCampaign.planJson.sessions,
-        startAt: editingCampaign.planJson.schedule?.startAt || "",
-        endAt: editingCampaign.planJson.schedule?.endAt || "",
-        quietHours: editingCampaign.planJson.schedule?.quietHours || [],
+        delayMin: editingCampaign.plan_json.delayMin,
+        delayMax: editingCampaign.plan_json.delayMax,
+        sessions: editingCampaign.plan_json.sessions,
+        startAt: editingCampaign.plan_json.schedule?.startAt || "",
+        endAt: editingCampaign.plan_json.schedule?.endAt || "",
+        quietHours: editingCampaign.plan_json.schedule?.quietHours || [],
       });
       setSelectedContactPool(editingCampaign.pool);
       setOpen(true);
