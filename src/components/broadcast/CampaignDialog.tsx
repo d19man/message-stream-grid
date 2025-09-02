@@ -67,6 +67,27 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
   const { toast } = useToast();
   const { profile } = useAuth();
 
+  // Filter available pools based on user role
+  const getAvailablePools = (): PoolType[] => {
+    if (!profile?.role) return ["CRM"];
+    
+    switch (profile.role) {
+      case 'crm':
+        return ["CRM"];
+      case 'blaster':
+        return ["BLASTER"];
+      case 'warmup':
+        return ["WARMUP"];
+      case 'admin':
+      case 'superadmin':
+        return ["CRM", "BLASTER", "WARMUP"];
+      default:
+        return ["CRM"];
+    }
+  };
+
+  const availablePools = getAvailablePools();
+
   // Mock data - in real app, these would come from API
   const templates: Template[] = [
     { id: "1", name: "Welcome Message", kind: "text", allowedIn: ["CRM", "WARMUP"], contentJson: { text: "Hello {{name}}!" }, userId: "1", createdAt: "", updatedAt: "" },
@@ -308,11 +329,13 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
                 <SelectTrigger>
                   <SelectValue placeholder="Select pool type" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CRM">CRM - Customer Relationship</SelectItem>
-                  <SelectItem value="BLASTER">Blaster - Bulk Campaigns</SelectItem>
-                  <SelectItem value="WARMUP">Warmup - Account Warming</SelectItem>
-                </SelectContent>
+                 <SelectContent>
+                   {availablePools.map((pool) => (
+                     <SelectItem key={pool} value={pool}>
+                       {pool} - {pool === 'CRM' ? 'Customer Relationship' : pool === 'BLASTER' ? 'Bulk Campaigns' : 'Account Warming'}
+                     </SelectItem>
+                   ))}
+                 </SelectContent>
               </Select>
             </div>
           </div>
@@ -389,11 +412,7 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
 
         // Check if user has access to selected pool
         const hasAccessToPool = (pool: PoolType) => {
-          if (profile?.role === 'superadmin' || profile?.role === 'admin') {
-            return true;
-          }
-          // Regular users only have access to CRM for now
-          return pool === 'CRM';
+          return availablePools.includes(pool);
         };
         
         return (
@@ -414,28 +433,34 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
                 setSelectedContactPool(value as PoolType);
                 setFormData(prev => ({ ...prev, selectedTags: [], targetContacts: [] }));
               }} className="w-full max-w-md">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger 
-                    value="CRM" 
-                    className="text-sm"
-                    disabled={!hasAccessToPool('CRM')}
-                  >
-                    CRM
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="BLASTER" 
-                    className="text-sm"
-                    disabled={!hasAccessToPool('BLASTER')}
-                  >
-                    BLASTER
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="WARMUP" 
-                    className="text-sm"
-                    disabled={!hasAccessToPool('WARMUP')}
-                  >
-                    WARMUP
-                  </TabsTrigger>
+                <TabsList className={`grid w-full ${availablePools.length === 1 ? 'grid-cols-1' : availablePools.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {availablePools.includes("CRM") && (
+                    <TabsTrigger 
+                      value="CRM" 
+                      className="text-sm"
+                      disabled={!hasAccessToPool('CRM')}
+                    >
+                      CRM
+                    </TabsTrigger>
+                  )}
+                  {availablePools.includes("BLASTER") && (
+                    <TabsTrigger 
+                      value="BLASTER" 
+                      className="text-sm"
+                      disabled={!hasAccessToPool('BLASTER')}
+                    >
+                      BLASTER
+                    </TabsTrigger>
+                  )}
+                  {availablePools.includes("WARMUP") && (
+                    <TabsTrigger 
+                      value="WARMUP" 
+                      className="text-sm"
+                      disabled={!hasAccessToPool('WARMUP')}
+                    >
+                      WARMUP
+                    </TabsTrigger>
+                  )}
                 </TabsList>
               </Tabs>
             </div>
