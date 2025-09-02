@@ -58,7 +58,7 @@ export const ShareSessionDialog = ({ trigger, sessionName, onShare }: ShareSessi
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" aria-describedby="share-session-description">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Crown className="h-5 w-5 text-primary" />
@@ -67,7 +67,7 @@ export const ShareSessionDialog = ({ trigger, sessionName, onShare }: ShareSessi
         </DialogHeader>
         
         <div className="space-y-4">
-          <div className="bg-muted rounded-lg p-3">
+          <div className="bg-muted rounded-lg p-3" id="share-session-description">
             <p className="text-sm">
               <span className="font-medium">Session:</span> {sessionName}
             </p>

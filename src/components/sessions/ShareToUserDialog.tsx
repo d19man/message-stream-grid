@@ -82,7 +82,7 @@ export const ShareToUserDialog = ({ trigger, sessionName, sessionPool, onShare }
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" aria-describedby="assign-session-description">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Users className="h-5 w-5 text-primary" />
@@ -91,7 +91,7 @@ export const ShareToUserDialog = ({ trigger, sessionName, sessionPool, onShare }
         </DialogHeader>
         
         <div className="space-y-4">
-          <div className="bg-muted rounded-lg p-3">
+          <div className="bg-muted rounded-lg p-3" id="assign-session-description">
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium">Session: {sessionName}</span>
               <Badge className={getPoolColor(sessionPool)}>
