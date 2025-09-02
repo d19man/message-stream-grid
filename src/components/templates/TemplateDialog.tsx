@@ -28,7 +28,28 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
     contentJson: template?.contentJson || {},
   });
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+
+  // Filter available pools based on user role
+  const getAvailablePools = (): PoolType[] => {
+    if (!profile?.role) return ["CRM"];
+    
+    switch (profile.role) {
+      case 'crm':
+        return ["CRM"];
+      case 'blaster':
+        return ["BLASTER"];
+      case 'warmup':
+        return ["WARMUP"];
+      case 'admin':
+      case 'superadmin':
+        return ["CRM", "BLASTER", "WARMUP"];
+      default:
+        return ["CRM"];
+    }
+  };
+
+  const availablePools = getAvailablePools();
 
   const handleAudioUpload = async (file: File) => {
     if (!user) {
@@ -401,7 +422,7 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
           <div>
             <Label className="mb-3 block">Allowed in Pools</Label>
             <div className="flex space-x-4">
-              {(["CRM", "BLASTER", "WARMUP"] as PoolType[]).map(pool => (
+              {availablePools.map(pool => (
                 <div key={pool} className="flex items-center space-x-2">
                   <Checkbox
                     id={pool}
