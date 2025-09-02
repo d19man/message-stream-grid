@@ -107,6 +107,13 @@ const Users = () => {
   const handleDeleteUser = async (id: string) => {
     const { canManageUsers: userCanManage } = useAuth();
     
+    console.log('Delete user attempt:', {
+      currentUserId: profile?.id,
+      currentUserRole: profile?.role,
+      targetUserId: id,
+      canManageUsers: userCanManage()
+    });
+    
     if (!userCanManage()) {
       toast({
         title: "Access Denied",
@@ -118,7 +125,17 @@ const Users = () => {
 
     // Prevent deleting yourself or higher level users
     const userToDelete = users.find(u => u.id === id);
-    if (!userToDelete) return;
+    if (!userToDelete) {
+      console.log('User to delete not found:', id);
+      return;
+    }
+
+    console.log('User to delete:', {
+      id: userToDelete.id,
+      email: userToDelete.email,
+      role: userToDelete.role,
+      admin_id: userToDelete.admin_id
+    });
 
     // Prevent users from deleting themselves
     if (userToDelete.id === profile?.id) {
@@ -135,6 +152,20 @@ const Users = () => {
       toast({
         title: "Access Denied",
         description: "You cannot delete admin or superadmin users",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Additional check: Admin can only delete users assigned to them
+    if (profile?.role === 'admin' && userToDelete.admin_id !== profile?.id) {
+      console.log('Admin trying to delete user not assigned to them:', {
+        userAdminId: userToDelete.admin_id,
+        currentAdminId: profile?.id
+      });
+      toast({
+        title: "Access Denied",
+        description: "You can only delete users assigned to you",
         variant: "destructive",
       });
       return;
@@ -230,11 +261,13 @@ const Users = () => {
           return;
         }
 
-        // Delete from auth.users
-        const { error: authError } = await supabase.auth.admin.deleteUser(id);
-        if (authError) {
-          console.error('Auth delete error:', authError);
-          // Don't return here as profile is already deleted
+        // Delete from auth.users - Only superadmin can do this
+        if (profile?.role === 'superadmin') {
+          const { error: authError } = await supabase.auth.admin.deleteUser(id);
+          if (authError) {
+            console.error('Auth delete error (continuing anyway):', authError);
+            // Continue anyway - profile is deleted
+          }
         }
 
         setUsers(prev => prev.filter(u => u.id !== id));
