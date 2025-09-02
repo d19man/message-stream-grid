@@ -7,8 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Send, Users, Clock, Settings, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import type { BroadcastJob, PoolType, Template, Contact, Session } from "@/types";
 import { PREDEFINED_TAGS } from "../contacts/ImportContactDialog";
 
@@ -22,6 +24,7 @@ interface CampaignDialogProps {
 export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel }: CampaignDialogProps) => {
   const [open, setOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [selectedContactPool, setSelectedContactPool] = useState<PoolType>("CRM");
   const [formData, setFormData] = useState({
     name: "",
     pool: "" as PoolType | "",
@@ -56,11 +59,13 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
         endAt: editingCampaign.planJson.schedule?.endAt || "",
         quietHours: editingCampaign.planJson.schedule?.quietHours || [],
       });
+      setSelectedContactPool(editingCampaign.pool);
       setOpen(true);
     }
   }, [editingCampaign]);
 
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   // Mock data - in real app, these would come from API
   const templates: Template[] = [
@@ -221,19 +226,29 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
     }));
   };
 
-  // Get contacts filtered by pool and selected tags
+  // Get contacts filtered by pool and selected tags with role-based access
   const getFilteredContacts = () => {
     let filtered = contacts;
     
-    // First filter by pool/system match
-    if (formData.pool) {
-      const systemMapping: Record<PoolType, string> = {
-        'CRM': 'crm',
-        'BLASTER': 'blaster',
-        'WARMUP': 'warmup'
-      };
-      filtered = filtered.filter(contact => contact.system === systemMapping[formData.pool]);
-    }
+    // Role-based filtering - limit what pools users can see
+    const getAccessibleContacts = () => {
+      if (profile?.role === 'superadmin' || profile?.role === 'admin') {
+        return contacts; // Super admin and admin see all
+      }
+      // Regular users only see contacts from their default pool based on role
+      // For now, assume CRM users work with CRM contacts
+      return contacts.filter(contact => contact.system === 'crm');
+    };
+
+    filtered = getAccessibleContacts();
+    
+    // Filter by selected pool tab
+    const systemMapping: Record<PoolType, string> = {
+      'CRM': 'crm',
+      'BLASTER': 'blaster',
+      'WARMUP': 'warmup'
+    };
+    filtered = filtered.filter(contact => contact.system === systemMapping[selectedContactPool]);
     
     // Then filter by selected tags
     if (formData.selectedTags.length > 0) {
@@ -353,29 +368,39 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
         const totalContacts = formData.targetContacts.length + formData.manualPhones.length;
         const validManualPhones = validatePhoneNumbers(formData.manualPhones);
         const filteredContacts = getFilteredContacts();
-        // Get all unique tags from filtered contacts (those matching the selected pool)
-        const poolFilteredContacts = formData.pool ? contacts.filter(contact => {
+        
+        // Get all unique tags from contacts based on role and selected pool
+        const getAccessibleContactsForTags = () => {
+          if (profile?.role === 'superadmin' || profile?.role === 'admin') {
+            return contacts;
+          }
+          return contacts.filter(contact => contact.system === 'crm');
+        };
+
+        const poolFilteredContactsForTags = getAccessibleContactsForTags().filter(contact => {
           const systemMapping: Record<PoolType, string> = {
             'CRM': 'crm',
             'BLASTER': 'blaster',
             'WARMUP': 'warmup'
           };
-          return contact.system === systemMapping[formData.pool];
-        }) : contacts;
-        const allTags = Array.from(new Set(poolFilteredContacts.flatMap(contact => contact.tags)));
+          return contact.system === systemMapping[selectedContactPool];
+        });
+        const allTags = Array.from(new Set(poolFilteredContactsForTags.flatMap(contact => contact.tags)));
+
+        // Check if user has access to selected pool
+        const hasAccessToPool = (pool: PoolType) => {
+          if (profile?.role === 'superadmin' || profile?.role === 'admin') {
+            return true;
+          }
+          // Regular users only have access to CRM for now
+          return pool === 'CRM';
+        };
         
         return (
           <div className="space-y-6">
             <div className="text-center mb-4">
               <h3 className="text-lg font-semibold">Target Contacts</h3>
-              <p className="text-sm text-muted-foreground">Select contacts or add phone numbers manually</p>
-              {formData.pool && (
-                <div className="mt-2">
-                  <Badge variant="secondary" className="text-xs">
-                    Targeting: {formData.pool} System
-                  </Badge>
-                </div>
-              )}
+              <p className="text-sm text-muted-foreground">Select contacts by category or add phone numbers manually</p>
               <div className="mt-2">
                 <span className="text-sm font-medium text-primary">
                   Total: {totalContacts} contacts selected
@@ -383,17 +408,56 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
               </div>
             </div>
 
+            {/* Pool Tabs */}
+            <div className="flex justify-center">
+              <Tabs value={selectedContactPool} onValueChange={(value) => {
+                setSelectedContactPool(value as PoolType);
+                setFormData(prev => ({ ...prev, selectedTags: [], targetContacts: [] }));
+              }} className="w-full max-w-md">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger 
+                    value="CRM" 
+                    className="text-sm"
+                    disabled={!hasAccessToPool('CRM')}
+                  >
+                    CRM
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="BLASTER" 
+                    className="text-sm"
+                    disabled={!hasAccessToPool('BLASTER')}
+                  >
+                    BLASTER
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="WARMUP" 
+                    className="text-sm"
+                    disabled={!hasAccessToPool('WARMUP')}
+                  >
+                    WARMUP
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {/* Pool Info */}
+            <div className="text-center">
+              <Badge variant="secondary" className="text-xs">
+                Viewing: {selectedContactPool} Contacts
+              </Badge>
+            </div>
+
             {/* Tag Filter Section */}
             <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Tag className="h-4 w-4" />
-                <span className="font-medium">Filter by Tags</span>
-                {formData.selectedTags.length > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    ({formData.selectedTags.length} tag(s) selected)
-                  </span>
-                )}
-              </div>
+                <div className="flex items-center space-x-2">
+                  <Tag className="h-4 w-4" />
+                  <span className="font-medium">Filter by Tags - {selectedContactPool}</span>
+                  {formData.selectedTags.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      ({formData.selectedTags.length} tag(s) selected)
+                    </span>
+                  )}
+                </div>
               
 
               {/* Available Tags from Contacts */}
@@ -418,7 +482,7 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
               {formData.selectedTags.length > 0 && (
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-muted-foreground">
-                    Showing {filteredContacts.length} of {contacts.length} contacts
+                    Showing {filteredContacts.length} of {poolFilteredContactsForTags.length} {selectedContactPool} contacts
                   </div>
                   <Button
                     type="button"
@@ -481,7 +545,7 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <span className="font-medium">Saved Contacts</span>
+                  <span className="font-medium">{selectedContactPool} Contacts</span>
                   <span className="text-xs text-muted-foreground">
                     ({formData.targetContacts.length} selected from {filteredContacts.length} shown)
                   </span>
@@ -506,7 +570,7 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
                     }}
                   />
                   <Label htmlFor="select-all" className="font-medium cursor-pointer">
-                    Select All {formData.selectedTags.length > 0 ? 'Filtered' : ''} Contacts
+                    Select All {formData.selectedTags.length > 0 ? 'Filtered' : ''} {selectedContactPool} Contacts
                   </Label>
                 </div>
                 {filteredContacts.map((contact) => (
@@ -536,15 +600,15 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
                 {filteredContacts.length === 0 && formData.selectedTags.length > 0 && (
                   <div className="text-center py-4 text-muted-foreground">
                     <Tag className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No contacts found with selected tags</p>
+                    <p className="text-sm">No {selectedContactPool} contacts found with selected tags</p>
                     <p className="text-xs">Try different tags or clear filters</p>
                   </div>
                 )}
-                {contacts.length === 0 && (
+                {poolFilteredContactsForTags.length === 0 && (
                   <div className="text-center py-4 text-muted-foreground">
                     <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No saved contacts found</p>
-                    <p className="text-xs">Use manual input above to add phone numbers</p>
+                    <p className="text-sm">No {selectedContactPool} contacts found</p>
+                    <p className="text-xs">Switch to a different tab or use manual input above</p>
                   </div>
                 )}
               </div>
