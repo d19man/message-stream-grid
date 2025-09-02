@@ -107,7 +107,6 @@ const Users = () => {
   const handleDeleteUser = async (id: string) => {
     console.log('=== DELETE USER START ===', id, profile?.role);
     
-    const { canManageUsers } = useAuth();
     if (!canManageUsers()) {
       toast({ title: "Access Denied", description: "No permission", variant: "destructive" });
       return;
