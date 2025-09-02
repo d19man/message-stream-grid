@@ -28,9 +28,47 @@ import type { Contact, PoolType } from "@/types";
 const Contacts = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [selectedPool, setSelectedPool] = useState<PoolType>("CRM");
   const { toast } = useToast();
   const { profile } = useAuth();
+
+  // Filter available pools based on user role
+  const getAvailablePools = (): PoolType[] => {
+    if (!profile?.role) return ["CRM"];
+    
+    switch (profile.role) {
+      case 'crm':
+        return ["CRM"];
+      case 'blaster':
+        return ["BLASTER"];
+      case 'warmup':
+        return ["WARMUP"];
+      case 'admin':
+      case 'superadmin':
+        return ["CRM", "BLASTER", "WARMUP"];
+      default:
+        return ["CRM"];
+    }
+  };
+
+  const availablePools = getAvailablePools();
+  
+  // Set default pool based on user role
+  const getDefaultPool = (): PoolType => {
+    if (!profile?.role) return "CRM";
+    
+    switch (profile.role) {
+      case 'crm':
+        return "CRM";
+      case 'blaster':
+        return "BLASTER";
+      case 'warmup':
+        return "WARMUP";
+      default:
+        return "CRM";
+    }
+  };
+
+  const [selectedPool, setSelectedPool] = useState<PoolType>(getDefaultPool());
 
   // Mock data
   const initialContacts: Contact[] = [
@@ -213,16 +251,22 @@ const Contacts = () => {
         </div>
       </div>
 
-      {/* Pool Tabs */}
+      {/* Pool Tabs - Only show pools available to user */}
       <div className="flex justify-center">
         <Tabs value={selectedPool} onValueChange={(value) => {
           setSelectedPool(value as PoolType);
           setSelectedTag(null); // Reset tag filter when switching pools
         }} className="w-full max-w-md">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="CRM" className="text-sm">CRM</TabsTrigger>
-            <TabsTrigger value="BLASTER" className="text-sm">BLASTER</TabsTrigger>
-            <TabsTrigger value="WARMUP" className="text-sm">WARMUP</TabsTrigger>
+          <TabsList className={`grid w-full ${availablePools.length === 1 ? 'grid-cols-1' : availablePools.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            {availablePools.includes("CRM") && (
+              <TabsTrigger value="CRM" className="text-sm">CRM</TabsTrigger>
+            )}
+            {availablePools.includes("BLASTER") && (
+              <TabsTrigger value="BLASTER" className="text-sm">BLASTER</TabsTrigger>
+            )}
+            {availablePools.includes("WARMUP") && (
+              <TabsTrigger value="WARMUP" className="text-sm">WARMUP</TabsTrigger>
+            )}
           </TabsList>
         </Tabs>
       </div>

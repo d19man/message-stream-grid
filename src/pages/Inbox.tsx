@@ -14,9 +14,49 @@ import {
   MoreVertical,
 } from "lucide-react";
 import type { PoolType, InboxMessage } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Inbox = () => {
-  const [selectedPool, setSelectedPool] = useState<PoolType>("CRM");
+  const { profile } = useAuth();
+  
+  // Filter available pools based on user role
+  const getAvailablePools = (): PoolType[] => {
+    if (!profile?.role) return ["CRM"];
+    
+    switch (profile.role) {
+      case 'crm':
+        return ["CRM"];
+      case 'blaster':
+        return ["BLASTER"];
+      case 'warmup':
+        return ["WARMUP"];
+      case 'admin':
+      case 'superadmin':
+        return ["CRM", "BLASTER", "WARMUP"];
+      default:
+        return ["CRM"];
+    }
+  };
+
+  const availablePools = getAvailablePools();
+  
+  // Set default pool based on user role
+  const getDefaultPool = (): PoolType => {
+    if (!profile?.role) return "CRM";
+    
+    switch (profile.role) {
+      case 'crm':
+        return "CRM";
+      case 'blaster':
+        return "BLASTER";
+      case 'warmup':
+        return "WARMUP";
+      default:
+        return "CRM";
+    }
+  };
+
+  const [selectedPool, setSelectedPool] = useState<PoolType>(getDefaultPool());
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
 
   // Mock data
@@ -95,12 +135,18 @@ const Inbox = () => {
           <div className="p-4 border-b border-border">
             <h1 className="text-xl font-bold mb-4">Inbox</h1>
             
-            {/* Pool Tabs */}
+            {/* Pool Tabs - Only show pools available to user */}
             <Tabs value={selectedPool} onValueChange={(value) => setSelectedPool(value as PoolType)}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="CRM" className="text-xs">CRM</TabsTrigger>
-                <TabsTrigger value="BLASTER" className="text-xs">BLAST</TabsTrigger>
-                <TabsTrigger value="WARMUP" className="text-xs">WARM</TabsTrigger>
+              <TabsList className={`grid w-full ${availablePools.length === 1 ? 'grid-cols-1' : availablePools.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                {availablePools.includes("CRM") && (
+                  <TabsTrigger value="CRM" className="text-xs">CRM</TabsTrigger>
+                )}
+                {availablePools.includes("BLASTER") && (
+                  <TabsTrigger value="BLASTER" className="text-xs">BLAST</TabsTrigger>
+                )}
+                {availablePools.includes("WARMUP") && (
+                  <TabsTrigger value="WARMUP" className="text-xs">WARM</TabsTrigger>
+                )}
               </TabsList>
             </Tabs>
 

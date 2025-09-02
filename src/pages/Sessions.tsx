@@ -27,7 +27,44 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { PoolType } from "@/types";
 
 const Sessions = () => {
-  const [activeTab, setActiveTab] = useState<PoolType>("CRM");
+  // Filter available pools based on user role
+  const getAvailablePools = (): PoolType[] => {
+    if (!profile?.role) return ["CRM"];
+    
+    switch (profile.role) {
+      case 'crm':
+        return ["CRM"];
+      case 'blaster':
+        return ["BLASTER"];
+      case 'warmup':
+        return ["WARMUP"];
+      case 'admin':
+      case 'superadmin':
+        return ["CRM", "BLASTER", "WARMUP"];
+      default:
+        return ["CRM"];
+    }
+  };
+
+  const availablePools = getAvailablePools();
+  
+  // Set default active tab based on user role
+  const getDefaultPool = (): PoolType => {
+    if (!profile?.role) return "CRM";
+    
+    switch (profile.role) {
+      case 'crm':
+        return "CRM";
+      case 'blaster':
+        return "BLASTER";
+      case 'warmup':
+        return "WARMUP";
+      default:
+        return "CRM";
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState<PoolType>(getDefaultPool());
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile } = useAuth();
@@ -170,24 +207,30 @@ const Sessions = () => {
         </div>
       )}
 
-      {/* Pool Tabs */}
+      {/* Pool Tabs - Only show pools available to user */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PoolType)}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="CRM" className="relative">
-            <Smartphone className="h-4 w-4 mr-2" />
-            CRM ({poolStats.CRM.connected}/{poolStats.CRM.total})
-          </TabsTrigger>
-          <TabsTrigger value="BLASTER" className="relative">
-            <Zap className="h-4 w-4 mr-2" />
-            Blaster ({poolStats.BLASTER.connected}/{poolStats.BLASTER.total})
-          </TabsTrigger>
-          <TabsTrigger value="WARMUP" className="relative">
-            <Wifi className="h-4 w-4 mr-2" />
-            Warmup ({poolStats.WARMUP.connected}/{poolStats.WARMUP.total})
-          </TabsTrigger>
+        <TabsList className={`grid w-full ${availablePools.length === 1 ? 'grid-cols-1' : availablePools.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          {availablePools.includes("CRM") && (
+            <TabsTrigger value="CRM" className="relative">
+              <Smartphone className="h-4 w-4 mr-2" />
+              CRM ({poolStats.CRM.connected}/{poolStats.CRM.total})
+            </TabsTrigger>
+          )}
+          {availablePools.includes("BLASTER") && (
+            <TabsTrigger value="BLASTER" className="relative">
+              <Zap className="h-4 w-4 mr-2" />
+              Blaster ({poolStats.BLASTER.connected}/{poolStats.BLASTER.total})
+            </TabsTrigger>
+          )}
+          {availablePools.includes("WARMUP") && (
+            <TabsTrigger value="WARMUP" className="relative">
+              <Wifi className="h-4 w-4 mr-2" />
+              Warmup ({poolStats.WARMUP.connected}/{poolStats.WARMUP.total})
+            </TabsTrigger>
+          )}
         </TabsList>
 
-        {["CRM", "BLASTER", "WARMUP"].map((pool) => (
+        {availablePools.map((pool) => (
           <TabsContent key={pool} value={pool} className="space-y-4">
             {filteredSessions.length === 0 ? (
               <Card className="shadow-card">
