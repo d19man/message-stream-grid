@@ -12,11 +12,14 @@ interface User {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'superadmin' | 'admin' | 'user';
+  role: 'superadmin' | 'admin' | 'user' | 'crm' | 'blaster' | 'warmup';
+  admin_id: string | null;
   subscription_type: string | null;
   subscription_start: string | null;
   subscription_end: string | null;
   subscription_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 interface SubscriptionDialogProps {

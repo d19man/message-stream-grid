@@ -15,7 +15,9 @@ import {
   UserX,
   Crown,
   Mail,
-  Calendar
+  Calendar,
+  Send,
+  Activity
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,7 +29,8 @@ interface User {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'superadmin' | 'admin' | 'user';
+  role: 'superadmin' | 'admin' | 'user' | 'crm' | 'blaster' | 'warmup';
+  admin_id: string | null;
   subscription_type: string | null;
   subscription_start: string | null;
   subscription_end: string | null;
@@ -43,15 +46,23 @@ const Users = () => {
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Check if current user is superadmin
-  const isSuperAdmin = profile?.role === 'superadmin';
+  // Check if current user can manage users
+  const canManageUsers = profile?.role === 'superadmin' || profile?.role === 'admin';
 
   const fetchUsers = async () => {
+    if (!profile) return; // Wait for profile to load
+    
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      let query = supabase.from('profiles').select('*');
+      
+      // Filter based on user role
+      if (profile.role === 'admin') {
+        // Admins only see their own users and themselves
+        query = query.or(`admin_id.eq.${profile.id},id.eq.${profile.id}`);
+      }
+      // Superadmins see all users (no additional filter needed)
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         toast({
@@ -76,14 +87,38 @@ const Users = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (profile) {
+      fetchUsers();
+    }
+  }, [profile?.id]);
 
   const handleDeleteUser = async (id: string) => {
-    if (!isSuperAdmin) {
+    if (!canManageUsers) {
       toast({
         title: "Access Denied",
-        description: "Only superadmins can delete users",
+        description: "You don't have permission to delete users",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prevent deleting yourself or higher level users
+    const userToDelete = users.find(u => u.id === id);
+    if (!userToDelete) return;
+
+    if (userToDelete.id === profile?.id) {
+      toast({
+        title: "Error",
+        description: "You cannot delete yourself",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (profile?.role === 'admin' && ['superadmin', 'admin'].includes(userToDelete.role)) {
+      toast({
+        title: "Access Denied",
+        description: "You cannot delete admin or superadmin users",
         variant: "destructive",
       });
       return;
@@ -137,12 +172,18 @@ const Users = () => {
   const getRoleIcon = (role: string) => {
     if (role === 'superadmin') return <Crown className="h-4 w-4 text-yellow-500" />;
     if (role === 'admin') return <Shield className="h-4 w-4 text-blue-500" />;
+    if (role === 'crm') return <Users2 className="h-4 w-4 text-green-500" />;
+    if (role === 'blaster') return <Send className="h-4 w-4 text-red-500" />;
+    if (role === 'warmup') return <Activity className="h-4 w-4 text-orange-500" />;
     return <Users2 className="h-4 w-4 text-gray-500" />;
   };
 
   const getRoleBadgeColor = (role: string) => {
     if (role === 'superadmin') return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
     if (role === 'admin') return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+    if (role === 'crm') return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+    if (role === 'blaster') return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+    if (role === 'warmup') return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
     return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
   };
 
@@ -196,9 +237,16 @@ const Users = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Users</h1>
-          <p className="text-muted-foreground">Manage system users and their subscriptions</p>
+          <p className="text-muted-foreground">
+            {profile?.role === 'superadmin' 
+              ? 'Manage all system users and their subscriptions'
+              : profile?.role === 'admin'
+              ? 'Manage your CRM, Blaster, and Warmup users'
+              : 'View user information'
+            }
+          </p>
         </div>
-        {isSuperAdmin && (
+        {canManageUsers && (
           <UserCreateDialog onSuccess={fetchUsers} />
         )}
       </div>
@@ -301,7 +349,7 @@ const Users = () => {
                   <TableHead>Role</TableHead>
                   <TableHead>Subscription</TableHead>
                   <TableHead>Last Updated</TableHead>
-                  {isSuperAdmin && <TableHead>Actions</TableHead>}
+                  {canManageUsers && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -322,7 +370,14 @@ const Users = () => {
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{user.email}</span>
+                        <div>
+                          <span className="text-sm">{user.email}</span>
+                          {user.admin_id && profile?.role === 'superadmin' && (
+                            <div className="text-xs text-muted-foreground">
+                              Admin: {users.find(u => u.id === user.admin_id)?.email || 'Unknown'}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -344,29 +399,29 @@ const Users = () => {
                         {new Date(user.updated_at).toLocaleDateString()}
                       </span>
                     </TableCell>
-                    {isSuperAdmin && (
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <SubscriptionDialog 
-                            user={user}
-                            onSuccess={fetchUsers}
-                            trigger={
-                              <Button variant="ghost" size="sm">
-                                <Calendar className="h-3 w-3" />
-                              </Button>
-                            }
-                          />
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteUser(user.id)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
+                  {canManageUsers && (
+                    <TableCell>
+                      <div className="flex items-center space-x-1">
+                        <SubscriptionDialog 
+                          user={user}
+                          onSuccess={fetchUsers}
+                          trigger={
+                            <Button variant="ghost" size="sm">
+                              <Calendar className="h-3 w-3" />
+                            </Button>
+                          }
+                        />
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteUser(user.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                   </TableRow>
                 ))}
               </TableBody>

@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UserPlus, AlertCircle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import SubscriptionDialog from '@/components/subscriptions/SubscriptionDialog';
 
 interface UserCreateDialogProps {
@@ -15,13 +16,13 @@ interface UserCreateDialogProps {
   onSuccess: () => void;
 }
 
-type UserRole = 'user' | 'admin' | 'superadmin';
+type UserRole = 'user' | 'admin' | 'superadmin' | 'crm' | 'blaster' | 'warmup';
 
 const UserCreateDialog: React.FC<UserCreateDialogProps> = ({ trigger, onSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<UserRole>('user');
+  const [role, setRole] = useState<UserRole>('crm'); // Default to crm for better UX
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,6 +30,27 @@ const UserCreateDialog: React.FC<UserCreateDialogProps> = ({ trigger, onSuccess 
   const [createdUser, setCreatedUser] = useState(null);
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Get available roles based on current user
+  const getAvailableRoles = (): { value: UserRole; label: string }[] => {
+    if (profile?.role === 'superadmin') {
+      return [
+        { value: 'admin', label: 'Admin' },
+        { value: 'user', label: 'User' },
+        { value: 'crm', label: 'CRM' },
+        { value: 'blaster', label: 'Blaster' },
+        { value: 'warmup', label: 'Warmup' }
+      ];
+    } else if (profile?.role === 'admin') {
+      return [
+        { value: 'crm', label: 'CRM' },
+        { value: 'blaster', label: 'Blaster' },
+        { value: 'warmup', label: 'Warmup' }
+      ];
+    }
+    return [];
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,13 +81,20 @@ const UserCreateDialog: React.FC<UserCreateDialogProps> = ({ trigger, onSuccess 
         return;
       }
 
-      // Update the profile with the selected role
+      // Update the profile with the selected role and admin_id
+      const updateData: any = { 
+        role: role,
+        full_name: fullName 
+      };
+
+      // Set admin_id if current user is admin (for their sub-users)
+      if (profile?.role === 'admin' && ['crm', 'blaster', 'warmup'].includes(role)) {
+        updateData.admin_id = profile.id;
+      }
+
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ 
-          role: role,
-          full_name: fullName 
-        })
+        .update(updateData)
         .eq('id', authData.user.id);
 
       if (profileError) {
@@ -79,6 +108,7 @@ const UserCreateDialog: React.FC<UserCreateDialogProps> = ({ trigger, onSuccess 
         email: email,
         full_name: fullName,
         role: role,
+        admin_id: profile?.role === 'admin' && ['crm', 'blaster', 'warmup'].includes(role) ? profile.id : null,
         subscription_type: null,
         subscription_start: null,
         subscription_end: null,
@@ -121,7 +151,7 @@ const UserCreateDialog: React.FC<UserCreateDialogProps> = ({ trigger, onSuccess 
     setEmail('');
     setPassword('');
     setFullName('');
-    setRole('user');
+    setRole('crm'); // Reset to default crm
     setError('');
     setSuccess('');
     setCreatedUser(null);
@@ -219,9 +249,11 @@ const UserCreateDialog: React.FC<UserCreateDialogProps> = ({ trigger, onSuccess 
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="superadmin">Super Admin</SelectItem>
+                  {getAvailableRoles().map((roleOption) => (
+                    <SelectItem key={roleOption.value} value={roleOption.value}>
+                      {roleOption.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

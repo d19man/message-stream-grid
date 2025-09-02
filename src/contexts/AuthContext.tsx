@@ -6,7 +6,8 @@ interface Profile {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'superadmin' | 'admin' | 'user';
+  role: 'superadmin' | 'admin' | 'user' | 'crm' | 'blaster' | 'warmup';
+  admin_id: string | null;
   created_at: string;
   updated_at: string;
 }
