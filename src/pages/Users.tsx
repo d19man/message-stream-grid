@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import SubscriptionDialog from '@/components/subscriptions/SubscriptionDialog';
 import UserCreateDialog from '@/components/users/UserCreateDialog';
 import ChangePasswordDialog from '@/components/users/ChangePasswordDialog';
+import ProfileUpdateDialog from '@/components/users/ProfileUpdateDialog';
 
 interface User {
   id: string;
@@ -282,9 +283,14 @@ const Users = () => {
             }
           </p>
         </div>
-        {canManageUsers() && (
-          <UserCreateDialog onSuccess={fetchUsers} />
-        )}
+        <div className="flex items-center space-x-2">
+          {canManageUsers() && (
+            <UserCreateDialog onSuccess={fetchUsers} />
+          )}
+          {profile?.role === 'superadmin' && (
+            <ProfileUpdateDialog onSuccess={fetchUsers} />
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
