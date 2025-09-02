@@ -1,6 +1,6 @@
 export type PoolType = 'CRM' | 'BLASTER' | 'WARMUP';
 
-export type SessionStatus = 'connecting' | 'qr_ready' | 'pairing' | 'connected' | 'disconnected' | 'error';
+export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'qr_required' | 'pairing_required';
 
 export interface Session {
   id: string;

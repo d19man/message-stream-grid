@@ -56,7 +56,7 @@ export const useSessions = () => {
     }
   };
 
-  const createSession = async (sessionData: Partial<Session>) => {
+  const createSession = async (sessionData: Partial<Session>): Promise<Session | null> => {
     try {
       const sessionId = crypto.randomUUID();
       
@@ -109,7 +109,11 @@ export const useSessions = () => {
         description: `WhatsApp session "${data.name}" has been created.`
       });
 
-      return data;
+      return { 
+        ...data, 
+        pool: data.pool as "CRM" | "BLASTER" | "WARMUP",
+        status: data.status as "connected" | "connecting" | "disconnected" | "qr_required" | "pairing_required"
+      } as Session;
     } catch (error) {
       console.error('Error:', error);
       toast({

@@ -44,7 +44,7 @@ export const SessionDialog = ({ trigger, onSave }: SessionDialogProps) => {
       return;
     }
 
-    const sessionStatus = formData.connectionMethod === "qr" ? "qr_ready" : "pairing";
+    const sessionStatus = formData.connectionMethod === "qr" ? "qr_required" : "pairing_required";
     onSave?.({ ...formData, status: sessionStatus } as Partial<Session>);
     setOpen(false);
     toast({
