@@ -67,48 +67,8 @@ const Inbox = () => {
     }
   }, [profile?.role]);
 
-  // Mock data
-  const messages: InboxMessage[] = [
-    {
-      id: "1",
-      pool: "CRM",
-      sessionId: "session1",
-      contactPhone: "+1234567890",
-      contactName: "John Doe",
-      direction: "incoming",
-      content: { text: "Hi, I need help with my order" },
-      messageType: "text",
-      isRead: false,
-      threadId: "thread1",
-      createdAt: "2024-01-15T10:30:00Z",
-    },
-    {
-      id: "2",
-      pool: "CRM",
-      sessionId: "session1",
-      contactPhone: "+1234567891",
-      contactName: "Jane Smith",
-      direction: "outgoing",
-      content: { text: "Thank you for contacting us!" },
-      messageType: "text",
-      isRead: true,
-      threadId: "thread2",
-      createdAt: "2024-01-15T10:25:00Z",
-    },
-    {
-      id: "3",
-      pool: "BLASTER",
-      sessionId: "session2",
-      contactPhone: "+1234567892",
-      contactName: "Mike Johnson",
-      direction: "outgoing",
-      content: { text: "Check out our latest offers!" },
-      messageType: "text",
-      isRead: true,
-      threadId: "thread3",
-      createdAt: "2024-01-15T10:20:00Z",
-    },
-  ];
+  // Mock data - removed, will use real data from backend
+  const messages: InboxMessage[] = [];
 
   const threads = messages.reduce((acc, msg) => {
     if (!acc[msg.threadId]) {

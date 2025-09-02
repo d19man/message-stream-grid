@@ -26,17 +26,12 @@ const Dashboard = () => {
   const [liveViewActive, setLiveViewActive] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [stats, setStats] = useState({
-    sessions: { total: 12, connected: 8, crm: 3, blaster: 4, warmup: 1 },
-    messages: { today: 1247, thisWeek: 8932, thisMonth: 32145 },
-    broadcasts: { active: 3, completed: 28, failed: 2 },
-    contacts: { total: 15420, optedOut: 234 },
+    sessions: { total: 0, connected: 0, crm: 0, blaster: 0, warmup: 0 },
+    messages: { today: 0, thisWeek: 0, thisMonth: 0 },
+    broadcasts: { active: 0, completed: 0, failed: 0 },
+    contacts: { total: 0, optedOut: 0 },
   });
-  const [recentActivity, setRecentActivity] = useState([
-    { id: 1, type: "broadcast", message: "Broadcast 'Summer Sale' completed", time: "2 min ago", status: "success" },
-    { id: 2, type: "session", message: "Session 'CRM-01' connected", time: "5 min ago", status: "success" },
-    { id: 3, type: "message", message: "247 messages sent in last hour", time: "10 min ago", status: "info" },
-    { id: 4, type: "error", message: "Session 'BLAST-03' disconnected", time: "15 min ago", status: "error" },
-  ]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   const quickActions = [
     { name: "Add Session", icon: Plus, color: "bg-gradient-primary", href: "/sessions" },
@@ -295,31 +290,38 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4 max-h-64 overflow-y-auto">
-              {recentActivity.map((activity) => (
-                <div 
-                  key={activity.id} 
-                  className={`flex items-center space-x-3 transition-all duration-300 ${
-                    activity.time === 'just now' ? 'bg-primary/5 p-2 rounded-lg border-l-2 border-primary' : ''
-                  }`}
-                >
-                  <div className={`p-1 rounded-full ${
-                    activity.status === 'success' ? 'bg-success/20' :
-                    activity.status === 'error' ? 'bg-destructive/20' : 'bg-primary/20'
-                  }`}>
-                    {activity.status === 'success' ? (
-                      <CheckCircle className="h-3 w-3 text-success" />
-                    ) : activity.status === 'error' ? (
-                      <AlertCircle className="h-3 w-3 text-destructive" />
-                    ) : (
-                      <Activity className="h-3 w-3 text-primary" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground">{activity.message}</p>
-                    <p className="text-xs text-muted-foreground">{activity.time}</p>
-                  </div>
+              {recentActivity.length === 0 ? (
+                <div className="text-center py-8">
+                  <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No recent activity</p>
                 </div>
-              ))}
+              ) : (
+                recentActivity.map((activity) => (
+                  <div 
+                    key={activity.id} 
+                    className={`flex items-center space-x-3 transition-all duration-300 ${
+                      activity.time === 'just now' ? 'bg-primary/5 p-2 rounded-lg border-l-2 border-primary' : ''
+                    }`}
+                  >
+                    <div className={`p-1 rounded-full ${
+                      activity.status === 'success' ? 'bg-success/20' :
+                      activity.status === 'error' ? 'bg-destructive/20' : 'bg-primary/20'
+                    }`}>
+                      {activity.status === 'success' ? (
+                        <CheckCircle className="h-3 w-3 text-success" />
+                      ) : activity.status === 'error' ? (
+                        <AlertCircle className="h-3 w-3 text-destructive" />
+                      ) : (
+                        <Activity className="h-3 w-3 text-primary" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground">{activity.message}</p>
+                      <p className="text-xs text-muted-foreground">{activity.time}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

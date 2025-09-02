@@ -346,10 +346,6 @@ const PoolSessions = () => {
             <RefreshCw className={`h-4 w-4 mr-2 ${healthLoading ? 'animate-spin' : ''}`} />
             Check Health
           </Button>
-          <Button variant="outline" onClick={sendTestMessage}>
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Test Message
-          </Button>
           {canCreateSession ? (
             <SessionDialog 
               trigger={

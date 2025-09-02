@@ -304,10 +304,6 @@ const Sessions = () => {
           <p className="text-muted-foreground">Manage your WhatsApp sessions across different pools</p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={sendTestMessage}>
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Test Message
-          </Button>
           <Button variant="outline" onClick={handleNewCampaign}>
             <Send className="h-4 w-4 mr-2" />
             New Campaign
