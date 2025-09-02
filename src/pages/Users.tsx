@@ -110,19 +110,11 @@ const Users = () => {
     const userToDelete = users.find(u => u.id === id);
     if (!userToDelete) return;
 
-    if (userToDelete.id === profile?.id) {
+    // Allow admin to delete themselves, but prevent admin from deleting other admins/superadmins
+    if (userToDelete.id !== profile?.id && profile?.role === 'admin' && ['superadmin', 'admin'].includes(userToDelete.role)) {
       toast({
-        title: "Error",
-        description: "You cannot delete yourself",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (profile?.role === 'admin' && ['superadmin', 'admin'].includes(userToDelete.role)) {
-      toast({
-        title: "Access Denied",
-        description: "You cannot delete admin or superadmin users",
+        title: "Access Denied", 
+        description: "You cannot delete admin or superadmin users (except yourself)",
         variant: "destructive",
       });
       return;
@@ -458,16 +450,19 @@ const Users = () => {
                     </TableCell>
                    {canManageUsers() && (
                      <TableCell>
-                       <div className="flex items-center space-x-1">
-                         <SubscriptionDialog 
-                           user={user}
-                           onSuccess={fetchUsers}
-                           trigger={
-                             <Button variant="ghost" size="sm">
-                               <Calendar className="h-3 w-3" />
-                             </Button>
-                           }
-                         />
+                        <div className="flex items-center space-x-1">
+                          {/* Only superadmin can manage subscriptions */}
+                          {profile?.role === 'superadmin' && (
+                            <SubscriptionDialog 
+                              user={user}
+                              onSuccess={fetchUsers}
+                              trigger={
+                                <Button variant="ghost" size="sm">
+                                  <Calendar className="h-3 w-3" />
+                                </Button>
+                              }
+                            />
+                          )}
                          {profile?.role === 'superadmin' && (user.role === 'admin' || user.role === 'user') && (
                            <ChangePasswordDialog 
                              userId={user.id}
