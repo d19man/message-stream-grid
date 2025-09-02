@@ -16,7 +16,7 @@ import Contacts from "./pages/Contacts";
 import Users from "./pages/Users";
 import Roles from "./pages/Roles";
 import Settings from "./pages/Settings";
-import Login from "./pages/Login";
+import Auth from "./pages/Auth";
 import ChangePassword from "./pages/ChangePassword";
 import NotFound from "./pages/NotFound";
 
@@ -37,18 +37,21 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/change-password" element={
-              <ProtectedRoute>
-                <ChangePassword />
-              </ProtectedRoute>
-            } />
+            {/* Public Routes */}
+            <Route path="/auth" element={<Auth />} />
+            
+            {/* Protected Routes with Layout */}
             <Route path="/" element={
               <ProtectedRoute>
                 <DashboardLayout />
               </ProtectedRoute>
             }>
               <Route index element={
+                <ProtectedRoute requiredPermission="dashboard">
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="dashboard" element={
                 <ProtectedRoute requiredPermission="dashboard">
                   <Dashboard />
                 </ProtectedRoute>
@@ -98,7 +101,10 @@ const App = () => (
                   <Settings />
                 </ProtectedRoute>
               } />
+              <Route path="change-password" element={<ChangePassword />} />
             </Route>
+            
+            {/* 404 Route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -14,20 +14,26 @@ import {
   Plus,
   Pause,
   Play,
+  Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { socketManager } from "@/lib/socket";
 import SubscriptionStatus from "@/components/subscriptions/SubscriptionStatus";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Stats } from "@/types";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, profile } = useAuth();
   const [liveViewActive, setLiveViewActive] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [stats, setStats] = useState({
-    sessions: { total: 0, connected: 0, crm: 0, blaster: 0, warmup: 0 },
-    messages: { today: 0, thisWeek: 0, thisMonth: 0 },
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Stats>({
+    sessions: { total: 0, connected: 0, byPool: { CRM: 0, BLASTER: 0, WARMUP: 0 } },
+    messages: { today: 0, thisWeek: 0, thisMonth: 0, byPool: { CRM: 0, BLASTER: 0, WARMUP: 0 } },
     broadcasts: { active: 0, completed: 0, failed: 0 },
     contacts: { total: 0, optedOut: 0 },
   });
@@ -40,31 +46,110 @@ const Dashboard = () => {
     { name: "Create Template", icon: MessageSquare, color: "bg-gradient-primary", href: "/templates" },
   ];
 
-  // Simulate real-time data updates
-  const generateRandomStats = useCallback(() => {
-    const sessionVariation = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
-    const messageVariation = Math.floor(Math.random() * 100) - 50; // -50 to 49
-    const broadcastVariation = Math.floor(Math.random() * 2); // 0 or 1
+  // Fetch real stats from Supabase
+  const fetchStats = useCallback(async () => {
+    if (!user || !profile) return;
     
-    setStats(prev => ({
-      sessions: {
-        ...prev.sessions,
-        connected: Math.max(0, Math.min(prev.sessions.total, prev.sessions.connected + sessionVariation)),
-      },
-      messages: {
-        ...prev.messages,
-        today: Math.max(0, prev.messages.today + messageVariation),
-      },
-      broadcasts: {
-        ...prev.broadcasts,
-        active: Math.max(0, prev.broadcasts.active + (Math.random() > 0.7 ? broadcastVariation : 0)),
-      },
-      contacts: {
-        ...prev.contacts,
-        total: prev.contacts.total + Math.floor(Math.random() * 5), // Slight increase
-      },
-    }));
-  }, []);
+    try {
+      setLoading(true);
+      
+      // Fetch sessions stats
+      let sessionsQuery = supabase.from('sessions').select('*');
+      if (profile.role === 'superadmin') {
+        // Superadmin sees all sessions
+      } else if (profile.role === 'admin') {
+        sessionsQuery = sessionsQuery.or(`admin_id.eq.${user.id},user_id.eq.${user.id}`);
+      } else {
+        sessionsQuery = sessionsQuery.eq('user_id', user.id);
+      }
+      
+      const { data: sessions } = await sessionsQuery;
+      
+      // Fetch contacts stats
+      let contactsQuery = supabase.from('contacts').select('*');
+      if (profile.role === 'superadmin') {
+        // Superadmin sees all contacts
+      } else if (profile.role === 'admin') {
+        contactsQuery = contactsQuery.or(`user_id.eq.${user.id},admin_id.eq.${user.id}`);
+      } else {
+        contactsQuery = contactsQuery.eq('user_id', user.id);
+      }
+      
+      const { data: contacts } = await contactsQuery;
+      
+      // Fetch broadcast jobs stats
+      let broadcastsQuery = supabase.from('broadcast_jobs').select('*');
+      if (profile.role === 'superadmin') {
+        // Superadmin sees all broadcasts
+      } else if (profile.role === 'admin') {
+        broadcastsQuery = broadcastsQuery.or(`user_id.eq.${user.id},admin_id.eq.${user.id}`);
+      } else {
+        broadcastsQuery = broadcastsQuery.eq('user_id', user.id);
+      }
+      
+      const { data: broadcasts } = await broadcastsQuery;
+      
+      // Fetch messages stats (from accessible sessions)
+      const sessionIds = sessions?.map(s => s.id) || [];
+      let messagesData = [];
+      if (sessionIds.length > 0) {
+        const { data: messages } = await supabase
+          .from('whatsapp_messages')
+          .select('*')
+          .in('session_id', sessionIds);
+        messagesData = messages || [];
+      }
+      
+      // Calculate stats
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      
+      const newStats: Stats = {
+        sessions: {
+          total: sessions?.length || 0,
+          connected: sessions?.filter(s => s.status === 'connected').length || 0,
+          byPool: {
+            CRM: sessions?.filter(s => s.pool === 'CRM').length || 0,
+            BLASTER: sessions?.filter(s => s.pool === 'BLASTER').length || 0,
+            WARMUP: sessions?.filter(s => s.pool === 'WARMUP').length || 0,
+          }
+        },
+        messages: {
+          today: messagesData.filter(m => new Date(m.timestamp) >= today).length,
+          thisWeek: messagesData.filter(m => new Date(m.timestamp) >= weekAgo).length,
+          thisMonth: messagesData.filter(m => new Date(m.timestamp) >= monthAgo).length,
+          byPool: {
+            CRM: 0, // Could be enhanced by joining with sessions
+            BLASTER: 0,
+            WARMUP: 0,
+          }
+        },
+        broadcasts: {
+          active: broadcasts?.filter(b => ['running', 'queued'].includes(b.status)).length || 0,
+          completed: broadcasts?.filter(b => b.status === 'completed').length || 0,
+          failed: broadcasts?.filter(b => b.status === 'failed').length || 0,
+        },
+        contacts: {
+          total: contacts?.length || 0,
+          optedOut: contacts?.filter(c => c.opt_out).length || 0,
+        },
+      };
+      
+      setStats(newStats);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard stats",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [user, profile]);
 
   const addRealtimeActivity = useCallback(() => {
     const activities = [
@@ -89,9 +174,10 @@ const Dashboard = () => {
     setLiveViewActive(newState);
     
     if (newState) {
-      // Connect socket
-      const userId = "current-user-id"; // This should come from auth context
-      socketManager.connect(userId);
+      // Connect socket and start live updates
+      if (user) {
+        socketManager.connect(user.id);
+      }
       
       toast({
         title: "Live View Activated",
@@ -102,23 +188,90 @@ const Dashboard = () => {
       socketManager.disconnect();
       
       toast({
-        title: "Live View Paused",
+        title: "Live View Paused", 
         description: "Real-time updates are now disabled",
       });
     }
   };
 
-  // Set up live updates
+  // Initial data fetch
   useEffect(() => {
+    if (user && profile) {
+      fetchStats();
+    }
+  }, [user, profile, fetchStats]);
+
+  // Set up real-time subscriptions
+  useEffect(() => {
+    if (!user || !profile) return;
+
+    const channels: any[] = [];
+
+    // Subscribe to sessions changes
+    const sessionsChannel = supabase
+      .channel('dashboard-sessions')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'sessions'
+      }, () => {
+        fetchStats();
+        addRealtimeActivity();
+      })
+      .subscribe();
+    channels.push(sessionsChannel);
+
+    // Subscribe to messages changes  
+    const messagesChannel = supabase
+      .channel('dashboard-messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public', 
+        table: 'whatsapp_messages'
+      }, () => {
+        fetchStats();
+        addRealtimeActivity();
+      })
+      .subscribe();
+    channels.push(messagesChannel);
+
+    // Subscribe to broadcast changes
+    const broadcastsChannel = supabase
+      .channel('dashboard-broadcasts')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'broadcast_jobs'
+      }, () => {
+        fetchStats();
+        addRealtimeActivity();
+      })
+      .subscribe();
+    channels.push(broadcastsChannel);
+
+    // Subscribe to contacts changes
+    const contactsChannel = supabase
+      .channel('dashboard-contacts')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'contacts'
+      }, () => {
+        fetchStats();
+        addRealtimeActivity();
+      })
+      .subscribe();
+    channels.push(contactsChannel);
+
+    // Set up live updates if active
     let intervalId: NodeJS.Timeout;
     let activityIntervalId: NodeJS.Timeout;
 
     if (liveViewActive) {
-      // Update stats every 3 seconds
+      // Refresh stats every 30 seconds
       intervalId = setInterval(() => {
-        generateRandomStats();
-        setLastUpdated(new Date());
-      }, 3000);
+        fetchStats();
+      }, 30000);
 
       // Add new activity every 8 seconds
       activityIntervalId = setInterval(() => {
@@ -128,9 +281,8 @@ const Dashboard = () => {
       // Set up socket listeners
       const socket = socketManager.getSocket();
       if (socket) {
-        socket.on('stats:update', (newStats) => {
-          setStats(newStats);
-          setLastUpdated(new Date());
+        socket.on('stats:update', () => {
+          fetchStats();
         });
 
         socket.on('activity:new', (activity) => {
@@ -142,16 +294,22 @@ const Dashboard = () => {
         });
 
         socket.on('message:received', () => {
-          generateRandomStats();
+          fetchStats();
         });
       }
     }
 
     return () => {
+      // Cleanup intervals
       if (intervalId) clearInterval(intervalId);
       if (activityIntervalId) clearInterval(activityIntervalId);
+      
+      // Cleanup channels
+      channels.forEach(channel => {
+        supabase.removeChannel(channel);
+      });
     };
-  }, [liveViewActive, generateRandomStats, addRealtimeActivity]);
+  }, [user, profile, liveViewActive, fetchStats, addRealtimeActivity]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -160,6 +318,17 @@ const Dashboard = () => {
     };
   }, []);
 
+  if (loading && !user) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -167,7 +336,14 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
           <div className="flex items-center space-x-4">
-            <p className="text-muted-foreground">Monitor your WhatsApp operations</p>
+            <p className="text-muted-foreground">
+              {profile?.role === 'superadmin' 
+                ? 'Monitor all WhatsApp operations across the system'
+                : profile?.role === 'admin'
+                ? 'Monitor WhatsApp operations for your teams'
+                : `Monitor your ${profile?.role?.toUpperCase()} operations`
+              }
+            </p>
             {liveViewActive && (
               <Badge variant="outline" className="animate-pulse">
                 <div className="w-2 h-2 bg-success rounded-full mr-2"></div>
@@ -200,9 +376,9 @@ const Dashboard = () => {
           <CardContent>
             <div className="text-2xl font-bold">{stats.sessions.connected}/{stats.sessions.total}</div>
             <div className="flex items-center space-x-2 mt-2">
-              <Badge variant="secondary" className="text-xs">CRM: {stats.sessions.crm}</Badge>
-              <Badge variant="secondary" className="text-xs">BLAST: {stats.sessions.blaster}</Badge>
-              <Badge variant="secondary" className="text-xs">WARM: {stats.sessions.warmup}</Badge>
+              <Badge variant="secondary" className="text-xs">CRM: {stats.sessions.byPool.CRM}</Badge>
+              <Badge variant="secondary" className="text-xs">BLAST: {stats.sessions.byPool.BLASTER}</Badge>
+              <Badge variant="secondary" className="text-xs">WARM: {stats.sessions.byPool.WARMUP}</Badge>
             </div>
           </CardContent>
         </Card>
