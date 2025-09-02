@@ -35,7 +35,7 @@ serve(async (req) => {
 
     switch (action) {
       case 'create':
-        return await createSession(supabaseClient, sessionName, sessionId);
+        return await createSession(supabaseClient, sessionName, sessionId, req);
       
       case 'connect':
         return await connectSession(supabaseClient, sessionId);
@@ -67,10 +67,10 @@ serve(async (req) => {
   }
 });
 
-async function createSession(supabaseClient: any, sessionName: string, sessionId: string) {
+async function createSession(supabaseClient: any, sessionName: string, sessionId: string, req: Request) {
   try {
     // Get current user from auth context
-    const authHeader = Deno.env.get('AUTHORIZATION') || '';
+    const authHeader = req.headers.get('authorization') || '';
     const token = authHeader.replace('Bearer ', '');
     
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
