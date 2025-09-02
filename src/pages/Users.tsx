@@ -140,33 +140,118 @@ const Users = () => {
       return;
     }
 
-    if (confirm("Are you sure you want to delete this user?")) {
+    if (confirm(`Are you sure you want to delete ${userToDelete.email}? This will delete all their data including sessions, contacts, and messages. This action cannot be undone.`)) {
       try {
-        const { error } = await supabase
+        setLoading(true);
+        
+        // Delete all related data for this user
+        console.log('Deleting user and all related data:', id);
+        
+        // 1. Delete WhatsApp contacts from user's sessions
+        const { data: userSessions } = await supabase
+          .from('whatsapp_sessions')
+          .select('id, session_name')
+          .eq('user_id', id);
+          
+        if (userSessions && userSessions.length > 0) {
+          const sessionIds = userSessions.map(s => s.id);
+          
+          // Delete contacts from these sessions
+          await supabase
+            .from('whatsapp_contacts')
+            .delete()
+            .in('session_id', sessionIds);
+            
+          // Delete messages from these sessions  
+          await supabase
+            .from('whatsapp_messages')
+            .delete()
+            .in('session_id', sessionIds);
+        }
+        
+        // 2. Delete WhatsApp sessions
+        await supabase
+          .from('whatsapp_sessions')
+          .delete()
+          .eq('user_id', id);
+          
+        // 3. Delete sessions where user is assigned
+        await supabase
+          .from('sessions')
+          .delete()
+          .eq('user_id', id);
+          
+        // 4. Delete API keys
+        await supabase
+          .from('user_api_keys')
+          .delete()
+          .eq('user_id', id);
+          
+        // 5. Delete wa_outbox entries from user's sessions
+        await supabase
+          .from('wa_outbox')
+          .delete()
+          .in('session_name', userSessions?.map(s => s.session_name) || []);
+          
+        // 6. Update sessions where user is admin (transfer to current user if superadmin)
+        if (profile?.role === 'superadmin') {
+          await supabase
+            .from('sessions')
+            .update({ admin_id: profile.id })
+            .eq('admin_id', id);
+            
+          await supabase
+            .from('whatsapp_sessions')
+            .update({ admin_id: profile.id })
+            .eq('admin_id', id);
+        }
+        
+        // 7. Update users who have this user as admin (transfer to current user if superadmin)
+        if (profile?.role === 'superadmin') {
+          await supabase
+            .from('profiles')
+            .update({ admin_id: profile.id })
+            .eq('admin_id', id);
+        }
+        
+        // 8. Finally delete the user profile and auth user
+        const { error: profileError } = await supabase
           .from('profiles')
           .delete()
           .eq('id', id);
 
-        if (error) {
+        if (profileError) {
+          console.error('Profile delete error:', profileError);
           toast({
             title: "Error",
-            description: "Failed to delete user",
+            description: `Failed to delete user profile: ${profileError.message}`,
             variant: "destructive",
           });
           return;
         }
 
+        // Delete from auth.users
+        const { error: authError } = await supabase.auth.admin.deleteUser(id);
+        if (authError) {
+          console.error('Auth delete error:', authError);
+          // Don't return here as profile is already deleted
+        }
+
         setUsers(prev => prev.filter(u => u.id !== id));
         toast({
           title: "Success",
-          description: "User deleted successfully!",
+          description: "User and all related data deleted successfully!",
         });
+        
       } catch (error) {
+        console.error('Delete user error:', error);
         toast({
           title: "Error",
-          description: "Failed to delete user",
+          description: "Failed to delete user completely. Some data may remain.",
           variant: "destructive",
         });
+      } finally {
+        setLoading(false);
       }
     }
   };
