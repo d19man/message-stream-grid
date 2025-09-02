@@ -250,13 +250,16 @@ const UserCreateDialog: React.FC<UserCreateDialogProps> = ({ trigger, onSuccess 
                 >
                   Done
                 </Button>
-                <Button
-                  type="button"
-                  onClick={handleSetSubscription}
-                  className="bg-gradient-primary"
-                >
-                  Set Subscription
-                </Button>
+                {/* Only superadmin can set subscription */}
+                {profile?.role === 'superadmin' && (
+                  <Button
+                    type="button"
+                    onClick={handleSetSubscription}
+                    className="bg-gradient-primary"
+                  >
+                    Set Subscription
+                  </Button>
+                )}
               </div>
             )}
           </form>
