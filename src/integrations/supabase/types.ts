@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
+          admin_id: string | null
           created_at: string
           email: string
           full_name: string | null
@@ -30,6 +31,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_id?: string | null
           created_at?: string
           email: string
           full_name?: string | null
@@ -44,6 +46,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_id?: string | null
           created_at?: string
           email?: string
           full_name?: string | null
@@ -57,7 +60,15 @@ export type Database = {
             | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_api_keys: {
         Row: {
@@ -104,7 +115,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "superadmin" | "admin" | "user"
+      app_role: "superadmin" | "admin" | "user" | "crm" | "blaster" | "warmup"
       subscription_type:
         | "lifetime"
         | "trial_1_day"
@@ -242,7 +253,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["superadmin", "admin", "user"],
+      app_role: ["superadmin", "admin", "user", "crm", "blaster", "warmup"],
       subscription_type: [
         "lifetime",
         "trial_1_day",
