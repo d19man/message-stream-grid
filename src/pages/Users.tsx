@@ -426,85 +426,12 @@ const Users = () => {
                             </span>
                           </div>
                           <div>
-                            <div className="flex items-center space-x-2">
-                              <p className="font-medium">{user.full_name || 'No name'}</p>
-                              {isAdmin && adminUserCount > 0 && profile?.role === 'superadmin' && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm"
-                                      className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                    >
-                                      <span>{adminUserCount} sub-users</span>
-                                      <ChevronDown className="h-3 w-3 ml-1" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent 
-                                    align="start" 
-                                    className="w-80 bg-background border shadow-lg z-50 max-h-96 overflow-y-auto"
-                                    sideOffset={5}
-                                  >
-                                    <div className="px-4 py-3 border-b bg-muted/50">
-                                      <p className="text-sm font-medium">Users under this admin</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {user.full_name || user.email} • {adminUserCount} users
-                                      </p>
-                                    </div>
-                                    <div className="py-2">
-                                      {users
-                                        .filter(u => u.admin_id === user.id)
-                                        .map((subUser) => (
-                                          <DropdownMenuItem 
-                                            key={subUser.id} 
-                                            className="flex items-center space-x-3 px-4 py-3 cursor-default focus:bg-muted/50"
-                                          >
-                                            <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center flex-shrink-0">
-                                              <span className="text-xs font-semibold text-primary-foreground">
-                                                {(subUser.full_name || subUser.email).charAt(0).toUpperCase()}
-                                              </span>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                              <div className="flex items-center justify-between">
-                                                <p className="text-sm font-medium truncate pr-2">
-                                                  {subUser.full_name || 'No name'}
-                                                </p>
-                                                <div className="flex items-center space-x-1 flex-shrink-0">
-                                                  {getRoleIcon(subUser.role)}
-                                                  <Badge 
-                                                    variant="secondary" 
-                                                    className="text-xs px-2 py-0.5"
-                                                  >
-                                                    {subUser.role}
-                                                  </Badge>
-                                                </div>
-                                              </div>
-                                              <p className="text-xs text-muted-foreground truncate">
-                                                {subUser.email}
-                                              </p>
-                                              <div className="flex items-center justify-between mt-1">
-                                                <div className="text-xs">
-                                                  {getSubscriptionStatus(subUser)}
-                                                </div>
-                                                <p className="text-xs text-muted-foreground">
-                                                  {new Date(subUser.updated_at).toLocaleDateString()}
-                                                </p>
-                                              </div>
-                                            </div>
-                                          </DropdownMenuItem>
-                                        ))}
-                                    </div>
-                                    <DropdownMenuSeparator />
-                                    <div className="px-4 py-2">
-                                      <p className="text-xs text-muted-foreground text-center">
-                                        <Eye className="h-3 w-3 inline mr-1" />
-                                        All users are also visible in the table above
-                                      </p>
-                                    </div>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                            </div>
+                            <p className="font-medium">{user.full_name || 'No name'}</p>
+                            {isAdmin && adminUserCount > 0 && profile?.role === 'superadmin' && (
+                              <p className="text-xs text-muted-foreground">
+                                {adminUserCount} users under this admin
+                              </p>
+                            )}
                           </div>
                         </div>
                       </TableCell>
