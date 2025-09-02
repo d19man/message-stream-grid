@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import RoleCreateDialog from '@/components/roles/RoleCreateDialog';
 import {
   Shield,
   Plus,
@@ -28,6 +29,7 @@ const Roles = () => {
   const [selectedRole, setSelectedRole] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedPermissions, setEditedPermissions] = useState<any[]>([]);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Fetch roles from database
   const fetchRoles = async () => {
@@ -259,7 +261,11 @@ const Roles = () => {
           <h1 className="text-3xl font-bold text-foreground">Roles & Permissions</h1>
           <p className="text-muted-foreground">Manage user roles and their permissions</p>
         </div>
-        <Button className="bg-gradient-primary hover:opacity-90" style={{display: profile?.role === "superadmin" ? "flex" : "none"}}>
+        <Button 
+          className="bg-gradient-primary hover:opacity-90" 
+          style={{display: profile?.role === "superadmin" ? "flex" : "none"}}
+          onClick={() => setShowCreateDialog(true)}
+        >
           <Plus className="h-4 w-4 mr-2" />
           New Role
         </Button>
@@ -511,9 +517,16 @@ const Roles = () => {
               </CardContent>
             </Card>
           )}
-        </div>
-      </div>
-    </div>
+         </div>
+       </div>
+
+       {/* Create Role Dialog */}
+       <RoleCreateDialog 
+         open={showCreateDialog}
+         onOpenChange={setShowCreateDialog}
+         onRoleCreated={fetchRoles}
+       />
+     </div>
   );
 };
 
