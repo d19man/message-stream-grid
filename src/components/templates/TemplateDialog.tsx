@@ -107,14 +107,95 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
     }
   };
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleAudioUpload(file);
+  const handleImageUpload = async (file: File) => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to upload files",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Error",
+        description: "Please upload a valid image file (JPEG, PNG, GIF, WebP)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('template-images')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('template-images')
+        .getPublicUrl(fileName);
+
+      // Update form data with the uploaded file URL
+      setFormData(prev => ({
+        ...prev,
+        contentJson: { 
+          ...prev.contentJson, 
+          mediaUrl: publicUrl,
+          fileName: file.name,
+          fileSize: file.size
+        }
+      }));
+
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully!",
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload image",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
-  const removeAudioFile = () => {
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'audio' | 'image') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (type === 'audio') {
+        handleAudioUpload(file);
+      } else {
+        handleImageUpload(file);
+      }
+    }
+  };
+
+  const removeMediaFile = () => {
     setFormData(prev => ({
       ...prev,
       contentJson: { 
@@ -152,6 +233,15 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
       toast({
         title: "Error",
         description: "Text content is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.kind === "image" && !formData.contentJson.mediaUrl?.trim()) {
+      toast({
+        title: "Error",
+        description: "Please upload an image file",
         variant: "destructive",
       });
       return;
@@ -347,16 +437,76 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
           {formData.kind === "image" && (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="image-url">Image URL</Label>
-                <Input
-                  id="image-url"
-                  value={formData.contentJson.mediaUrl || ""}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    contentJson: { ...prev.contentJson, mediaUrl: e.target.value }
-                  }))}
-                  placeholder="https://example.com/image.jpg"
-                />
+                <Label>Image File Upload</Label>
+                <div className="space-y-3">
+                  {!formData.contentJson.mediaUrl ? (
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
+                      <div className="text-center">
+                        <Image className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Upload an image file for your template
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-4">
+                          Supported formats: JPEG, PNG, GIF, WebP (max 5MB)
+                        </p>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileInputChange(e, 'image')}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            disabled={uploading}
+                          />
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            disabled={uploading}
+                            className="pointer-events-none"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploading ? "Uploading..." : "Choose Image File"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3">
+                          <div className="w-20 h-20 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                            <img 
+                              src={formData.contentJson.mediaUrl} 
+                              alt="Template image"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yNCAyNEg1NlY1NkgyNFYyNFoiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxjaXJjbGUgY3g9IjM0IiBjeT0iMzQiIHI9IjQiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTI0IDQ4TDMyIDQwTDQwIDQ4SDI0WiIgZmlsbD0iIzlDQTNBRiIvPgo8L3N2Zz4K';
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">
+                              {formData.contentJson.fileName || "Image file"}
+                            </p>
+                            {formData.contentJson.fileSize && (
+                              <p className="text-xs text-muted-foreground">
+                                {(formData.contentJson.fileSize / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={removeMediaFile}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <Label htmlFor="image-caption">Caption</Label>
@@ -392,7 +542,7 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                           <input
                             type="file"
                             accept="audio/*"
-                            onChange={handleFileInputChange}
+                            onChange={(e) => handleFileInputChange(e, 'audio')}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             disabled={uploading}
                           />
@@ -438,7 +588,7 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={removeAudioFile}
+                            onClick={removeMediaFile}
                             className="text-destructive hover:text-destructive"
                           >
                             <X className="h-4 w-4" />
