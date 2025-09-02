@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MessageSquare, AlertCircle } from 'lucide-react';
+import CreateSuperAdminDialog from '@/components/CreateSuperAdminDialog';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -107,10 +108,17 @@ const Login = () => {
               </Button>
             </form>
             
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-3">
               <p className="text-sm text-muted-foreground">
                 Hubungi superadmin untuk mendapatkan akses
               </p>
+              <CreateSuperAdminDialog 
+                trigger={
+                  <Button variant="outline" size="sm">
+                    Buat Superadmin
+                  </Button>
+                }
+              />
             </div>
           </CardContent>
         </Card>
