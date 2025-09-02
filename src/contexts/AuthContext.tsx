@@ -29,6 +29,9 @@ interface AuthContextType {
   canManageTemplates: () => boolean;
   canManageContacts: () => boolean;
   canViewInbox: () => boolean;
+  canAccessPoolSessions: () => boolean;
+  canManageRoles: () => boolean;
+  canAccessSettings: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -287,6 +290,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return ['superadmin', 'admin', 'crm'].includes(profile?.role || '');
   };
 
+  // Add missing permission functions
+  const canAccessPoolSessions = () => {
+    return ['superadmin', 'admin'].includes(profile?.role || '');
+  };
+
+  const canManageRoles = () => {
+    return ['superadmin', 'admin'].includes(profile?.role || '');
+  };
+
+  const canAccessSettings = () => {
+    return ['superadmin', 'admin', 'crm', 'blaster', 'warmup'].includes(profile?.role || '');
+  };
+
   const value = {
     user,
     session,
@@ -303,7 +319,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     canManageBroadcast,
     canManageTemplates,
     canManageContacts,
-    canViewInbox
+    canViewInbox,
+    canAccessPoolSessions,
+    canManageRoles,
+    canAccessSettings
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

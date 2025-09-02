@@ -76,7 +76,52 @@ const Sidebar = () => {
     marketingEmails: false,
   });
   const { toast } = useToast();
-  const { signOut, profile } = useAuth();
+  const { 
+    signOut, 
+    profile,
+    canAccessDashboard,
+    canManageSessions,
+    canAccessPoolSessions,
+    canViewInbox,
+    canManageBroadcast,
+    canManageTemplates,
+    canManageContacts,
+    canManageUsers,
+    canManageRoles,
+    canAccessSettings
+  } = useAuth();
+
+  // Filter navigation based on user permissions
+  const getFilteredNavigation = () => {
+    return navigation.filter(item => {
+      switch (item.href) {
+        case "/":
+          return canAccessDashboard();
+        case "/sessions":
+          return canManageSessions();
+        case "/pool-sessions":
+          return canAccessPoolSessions();
+        case "/inbox":
+          return canViewInbox();
+        case "/broadcast":
+          return canManageBroadcast();
+        case "/templates":
+          return canManageTemplates();
+        case "/contacts":
+          return canManageContacts();
+        case "/users":
+          return canManageUsers();
+        case "/roles":
+          return canManageRoles();
+        case "/settings":
+          return canAccessSettings();
+        default:
+          return false;
+      }
+    });
+  };
+
+  const filteredNavigation = getFilteredNavigation();
 
   // Use real profile data instead of hardcoded dummy data
   const [profileData, setProfileData] = useState({
@@ -210,7 +255,7 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2">
-        {navigation.map((item) => (
+        {filteredNavigation.map((item) => (
           <NavLink
             key={item.name}
             to={item.href}

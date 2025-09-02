@@ -48,16 +48,56 @@ const App = () => (
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<Dashboard />} />
-              <Route path="sessions" element={<Sessions />} />
-              <Route path="pool-sessions" element={<PoolSessions />} />
-              <Route path="inbox" element={<Inbox />} />
-              <Route path="broadcast" element={<Broadcast />} />
-              <Route path="templates" element={<Templates />} />
-              <Route path="contacts" element={<Contacts />} />
-              <Route path="users" element={<Users />} />
-              <Route path="roles" element={<Roles />} />
-              <Route path="settings" element={<Settings />} />
+              <Route index element={
+                <ProtectedRoute requiredPermission="dashboard">
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="sessions" element={
+                <ProtectedRoute requiredPermission="sessions">
+                  <Sessions />
+                </ProtectedRoute>
+              } />
+              <Route path="pool-sessions" element={
+                <ProtectedRoute requiredPermission="pool-sessions">
+                  <PoolSessions />
+                </ProtectedRoute>
+              } />
+              <Route path="inbox" element={
+                <ProtectedRoute requiredPermission="inbox">
+                  <Inbox />
+                </ProtectedRoute>
+              } />
+              <Route path="broadcast" element={
+                <ProtectedRoute requiredPermission="broadcast">
+                  <Broadcast />
+                </ProtectedRoute>
+              } />
+              <Route path="templates" element={
+                <ProtectedRoute requiredPermission="templates">
+                  <Templates />
+                </ProtectedRoute>
+              } />
+              <Route path="contacts" element={
+                <ProtectedRoute requiredPermission="contacts">
+                  <Contacts />
+                </ProtectedRoute>
+              } />
+              <Route path="users" element={
+                <ProtectedRoute requiredPermission="users">
+                  <Users />
+                </ProtectedRoute>
+              } />
+              <Route path="roles" element={
+                <ProtectedRoute requiredPermission="roles">
+                  <Roles />
+                </ProtectedRoute>
+              } />
+              <Route path="settings" element={
+                <ProtectedRoute requiredPermission="settings">
+                  <Settings />
+                </ProtectedRoute>
+              } />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

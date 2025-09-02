@@ -4,10 +4,28 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requiredPermission?: string;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+  children, 
+  requiredPermission 
+}) => {
+  const { 
+    user, 
+    profile, 
+    loading,
+    canAccessDashboard,
+    canManageSessions,
+    canAccessPoolSessions,
+    canViewInbox,
+    canManageBroadcast,
+    canManageTemplates,
+    canManageContacts,
+    canManageUsers,
+    canManageRoles,
+    canAccessSettings
+  } = useAuth();
 
   if (loading) {
     return (
@@ -22,6 +40,50 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Check specific permissions based on route
+  if (requiredPermission && profile) {
+    let hasPermission = false;
+    
+    switch (requiredPermission) {
+      case 'dashboard':
+        hasPermission = canAccessDashboard();
+        break;
+      case 'sessions':
+        hasPermission = canManageSessions();
+        break;
+      case 'pool-sessions':
+        hasPermission = canAccessPoolSessions();
+        break;
+      case 'inbox':
+        hasPermission = canViewInbox();
+        break;
+      case 'broadcast':
+        hasPermission = canManageBroadcast();
+        break;
+      case 'templates':
+        hasPermission = canManageTemplates();
+        break;
+      case 'contacts':
+        hasPermission = canManageContacts();
+        break;
+      case 'users':
+        hasPermission = canManageUsers();
+        break;
+      case 'roles':
+        hasPermission = canManageRoles();
+        break;
+      case 'settings':
+        hasPermission = canAccessSettings();
+        break;
+      default:
+        hasPermission = true;
+    }
+
+    if (!hasPermission) {
+      return <Navigate to="/sessions" replace />;
+    }
   }
 
   return <>{children}</>;
