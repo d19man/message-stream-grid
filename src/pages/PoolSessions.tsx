@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSessions, Session } from "@/hooks/useSessions";
 import { useUsers } from "@/hooks/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
+import { socketClient } from "@/lib/socket-client";
 import { 
   Plus, 
   MoreHorizontal, 
@@ -35,12 +36,32 @@ import {
   Info,
   ArrowRightLeft,
   Crown,
-  Loader2
+  Loader2,
+  Activity,
+  MessageSquare,
+  CheckCircle,
+  AlertCircle,
+  XCircle
 } from "lucide-react";
 import type { PoolType } from "@/types";
 import { SessionDialog } from "@/components/sessions/SessionDialog";
 import { ShareSessionDialog } from "@/components/sessions/ShareSessionDialog";
 import { ShareToUserDialog } from "@/components/sessions/ShareToUserDialog";
+
+interface BackendHealth {
+  ok: boolean;
+  timestamp?: string;
+  backend?: string;
+  supabase?: string;
+  whatsapp?: string;
+  error?: string;
+}
+
+interface WhatsAppStatus {
+  session: string;
+  status: 'qr_ready' | 'connected' | 'disconnected';
+  qr?: string;
+}
 
 const PoolSessions = () => {
   const { user, profile } = useAuth();
@@ -55,6 +76,111 @@ const PoolSessions = () => {
     sessionId: null,
     isHardDelete: false
   });
+  const [backendHealth, setBackendHealth] = useState<BackendHealth | null>(null);
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>({
+    session: 'device1',
+    status: 'disconnected'
+  });
+  const [healthLoading, setHealthLoading] = useState(false);
+
+  // Initialize Socket.io connection
+  useEffect(() => {
+    const socket = socketClient.connect();
+    
+    socket.on('connect', () => {
+      setBackendConnected(true);
+      checkBackendHealth();
+    });
+
+    socket.on('disconnect', () => {
+      setBackendConnected(false);
+    });
+    
+    socketClient.onQRCode((data) => {
+      setWhatsappStatus({
+        session: data.session,
+        status: 'qr_ready',
+        qr: data.qr
+      });
+      toast({
+        title: "QR Code Ready",
+        description: `Scan QR code to connect ${data.session}`,
+      });
+    });
+    
+    socketClient.onStatusUpdate((data) => {
+      setWhatsappStatus({
+        session: data.session,
+        status: data.status as any,
+      });
+    });
+    
+    return () => {
+      socketClient.offQRCode();
+      socketClient.offStatusUpdate();
+    };
+  }, [toast]);
+
+  const checkBackendHealth = async () => {
+    setHealthLoading(true);
+    try {
+      const response = await fetch('http://localhost:3001/health');
+      const data = await response.json();
+      setBackendHealth(data);
+    } catch (error) {
+      setBackendHealth({
+        ok: false,
+        error: "Backend connection failed"
+      });
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
+  const sendTestMessage = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/wa/device1/sendText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jid: '6281234567890@s.whatsapp.net',
+          text: 'Test message from Pool Sessions!'
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.ok) {
+        toast({
+          title: "Message Sent",
+          description: "Test message sent successfully!",
+        });
+      } else {
+        throw new Error(result.error || 'Failed to send message');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send message",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getWhatsAppStatusIcon = (status: string) => {
+    switch (status) {
+      case 'connected':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'qr_ready':
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+      case 'disconnected':
+      default:
+        return <XCircle className="h-4 w-4 text-red-500" />;
+    }
+  };
 
   // Get available pools based on user role
   const getAvailablePools = (): PoolType[] => {
@@ -210,12 +336,20 @@ const PoolSessions = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">WhatsApp</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Pool Sessions</h1>
           <p className="text-muted-foreground">
-            Manage and share WhatsApp sessions across teams
+            Monitor and manage WhatsApp sessions across teams with real-time backend integration
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={checkBackendHealth} disabled={healthLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${healthLoading ? 'animate-spin' : ''}`} />
+            Check Health
+          </Button>
+          <Button variant="outline" onClick={sendTestMessage}>
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Test Message
+          </Button>
           {canCreateSession ? (
             <SessionDialog 
               trigger={
@@ -233,6 +367,72 @@ const PoolSessions = () => {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Backend Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Backend Health */}
+        <Card className="border-l-4 border-l-primary">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between text-base">
+              <div className="flex items-center space-x-2">
+                <Activity className="h-4 w-4" />
+                <span>Backend Health</span>
+              </div>
+              <Badge variant={backendHealth?.ok ? 'default' : 'destructive'} className="text-xs">
+                {backendHealth?.ok ? 'Healthy' : 'Error'}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {backendHealth ? (
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Supabase:</span>
+                  <span className={backendHealth.supabase === 'Connected' ? 'text-green-600' : 'text-red-600'}>
+                    {backendHealth.supabase || 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">WhatsApp:</span>
+                  <span className="text-green-600">{backendHealth.whatsapp || 'N/A'}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground">Click "Check Health" to verify backend status</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* WhatsApp Integration */}
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between text-base">
+              <div className="flex items-center space-x-2">
+                {getWhatsAppStatusIcon(whatsappStatus.status)}
+                <span>WhatsApp Integration</span>
+              </div>
+              <Badge variant={backendConnected ? 'default' : 'destructive'} className="text-xs">
+                {backendConnected ? 'Connected' : 'Offline'}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">{whatsappStatus.session}</div>
+                <div className="text-xs text-muted-foreground">{whatsappStatus.status.replace('_', ' ')}</div>
+              </div>
+              {whatsappStatus.status === 'qr_ready' && whatsappStatus.qr && (
+                <img 
+                  src={whatsappStatus.qr} 
+                  alt="WhatsApp QR Code" 
+                  className="w-12 h-12 border rounded"
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Permission Banner */}

@@ -35,8 +35,25 @@ app.locals.supabase = supabase;
 app.locals.io = io;
 
 // Routes
-app.get('/health', (req, res) => {
-  res.json({ ok: true });
+app.get('/health', async (req, res) => {
+  try {
+    // Check Supabase connection
+    const { data, error } = await supabase.from('wa_sessions').select('count').limit(1);
+    
+    res.json({ 
+      ok: true, 
+      timestamp: new Date().toISOString(),
+      backend: 'Express + Baileys + Supabase',
+      supabase: error ? 'Error' : 'Connected',
+      whatsapp: 'Baileys Ready'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      ok: false, 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 app.use('/wa', waRoutes);
