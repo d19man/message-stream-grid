@@ -169,6 +169,63 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_outbox: {
+        Row: {
+          created_at: string | null
+          error_text: string | null
+          id: string
+          message_type: string
+          payload_json: Json
+          sent_at: string | null
+          session_name: string
+          status: string
+          to_jid: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_text?: string | null
+          id?: string
+          message_type?: string
+          payload_json: Json
+          sent_at?: string | null
+          session_name: string
+          status?: string
+          to_jid: string
+        }
+        Update: {
+          created_at?: string | null
+          error_text?: string | null
+          id?: string
+          message_type?: string
+          payload_json?: Json
+          sent_at?: string | null
+          session_name?: string
+          status?: string
+          to_jid?: string
+        }
+        Relationships: []
+      }
+      wa_sessions: {
+        Row: {
+          id: string
+          last_active: string | null
+          name: string
+          status: string
+        }
+        Insert: {
+          id?: string
+          last_active?: string | null
+          name: string
+          status?: string
+        }
+        Update: {
+          id?: string
+          last_active?: string | null
+          name?: string
+          status?: string
+        }
+        Relationships: []
+      }
       whatsapp_contacts: {
         Row: {
           created_at: string
