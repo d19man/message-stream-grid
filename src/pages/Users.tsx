@@ -54,6 +54,7 @@ const Users = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [collapsedAdmins, setCollapsedAdmins] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { profile } = useAuth();
 
@@ -170,6 +171,19 @@ const Users = () => {
     }
   };
 
+  // Toggle admin collapse state
+  const toggleAdminCollapse = (adminId: string) => {
+    setCollapsedAdmins(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(adminId)) {
+        newSet.delete(adminId);
+      } else {
+        newSet.add(adminId);
+      }
+      return newSet;
+    });
+  };
+
   // Create hierarchical view for superadmin
   const getHierarchicalUsers = () => {
     if (profile?.role !== 'superadmin') {
@@ -183,11 +197,15 @@ const Users = () => {
     const superadmins = filteredUsers.filter(u => u.role === 'superadmin');
     hierarchicalView.push(...superadmins);
 
-    // Add each admin and their sub-users
+    // Add each admin and their sub-users (only if not collapsed)
     adminUsers.forEach(admin => {
       hierarchicalView.push(admin);
       const subUsers = filteredUsers.filter(u => u.admin_id === admin.id);
-      hierarchicalView.push(...subUsers);
+      
+      // Only add sub-users if admin is not collapsed
+      if (!collapsedAdmins.has(admin.id)) {
+        hierarchicalView.push(...subUsers);
+      }
     });
 
     // Add standalone users (no admin_id and not admin/superadmin)
@@ -418,23 +436,37 @@ const Users = () => {
                   
                   return (
                     <TableRow key={user.id} className={isSubUser ? 'bg-muted/30' : ''}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center ${isSubUser ? 'ml-6' : ''}`}>
-                            <span className="text-xs font-semibold text-primary-foreground">
-                              {(user.full_name || user.email).charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="font-medium">{user.full_name || 'No name'}</p>
-                            {isAdmin && adminUserCount > 0 && profile?.role === 'superadmin' && (
-                              <p className="text-xs text-muted-foreground">
-                                {adminUserCount} users under this admin
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
+                       <TableCell>
+                         <div className="flex items-center space-x-3">
+                           <div className={`w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center ${isSubUser ? 'ml-6' : ''}`}>
+                             <span className="text-xs font-semibold text-primary-foreground">
+                               {(user.full_name || user.email).charAt(0).toUpperCase()}
+                             </span>
+                           </div>
+                           <div className="flex-1">
+                             <div className="flex items-center space-x-2">
+                               <p className="font-medium">{user.full_name || 'No name'}</p>
+                               {isAdmin && adminUserCount > 0 && profile?.role === 'superadmin' && (
+                                 <Button
+                                   variant="ghost"
+                                   size="sm"
+                                   className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                   onClick={() => toggleAdminCollapse(user.id)}
+                                 >
+                                   <ChevronDown 
+                                     className={`h-3 w-3 transition-transform ${
+                                       collapsedAdmins.has(user.id) ? '-rotate-90' : ''
+                                     }`} 
+                                   />
+                                   <span className="ml-1">
+                                     {collapsedAdmins.has(user.id) ? 'Show' : 'Hide'} {adminUserCount} users
+                                   </span>
+                                 </Button>
+                               )}
+                             </div>
+                           </div>
+                         </div>
+                       </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Mail className="h-4 w-4 text-muted-foreground" />
