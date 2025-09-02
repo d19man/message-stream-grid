@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Shield,
   Plus,
@@ -16,8 +17,10 @@ import {
 import type { Role } from "@/types";
 
 const Roles = () => {
+  const { profile } = useAuth();
+  
   // Mock data
-  const roles: Role[] = [
+  const allRoles: Role[] = [
     {
       id: "1",
       name: "Super Admin",
@@ -75,6 +78,11 @@ const Roles = () => {
     },
   ];
 
+  // Filter roles based on user level - hide superadmin from non-superadmin users
+  const roles = profile?.role === "superadmin" 
+    ? allRoles 
+    : allRoles.filter(role => !role.permissions.includes("*"));
+
   // All available permissions
   const allPermissions = [
     { group: "Users & Roles", permissions: ["manage:user", "view:user", "manage:role", "view:role"] },
@@ -120,7 +128,7 @@ const Roles = () => {
           <h1 className="text-3xl font-bold text-foreground">Roles & Permissions</h1>
           <p className="text-muted-foreground">Manage user roles and their permissions</p>
         </div>
-        <Button className="bg-gradient-primary hover:opacity-90">
+        <Button className="bg-gradient-primary hover:opacity-90" style={{display: profile?.role === "superadmin" ? "flex" : "none"}}>
           <Plus className="h-4 w-4 mr-2" />
           New Role
         </Button>
@@ -191,13 +199,14 @@ const Roles = () => {
                     {getRoleIcon(selectedRole.name)}
                     <span>{selectedRole.name} Permissions</span>
                   </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditing(!isEditing)}
-                  >
-                    {isEditing ? "Cancel" : "Edit"}
-                  </Button>
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setIsEditing(!isEditing)}
+                     className={profile?.role !== "superadmin" ? "hidden" : ""}
+                   >
+                     {isEditing ? "Cancel" : "Edit"}
+                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -212,53 +221,47 @@ const Roles = () => {
                       All Permissions Granted
                     </Badge>
                   </div>
-                ) : (
-                  <div className="space-y-6">
-                    {allPermissions.map((group) => (
-                      <div key={group.group}>
-                        <h4 className="font-medium text-foreground mb-3 flex items-center space-x-2">
-                          <Lock className="h-4 w-4" />
-                          <span>{group.group}</span>
-                        </h4>
-                        <div className="grid grid-cols-1 gap-2 ml-6">
-                          {group.permissions.map((permission) => (
-                            <div key={permission} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={permission}
-                                checked={hasPermission(selectedRole, permission)}
-                                disabled={!isEditing}
-                              />
-                              <label
-                                htmlFor={permission}
-                                className={`text-sm ${
-                                  hasPermission(selectedRole, permission)
-                                    ? "text-foreground"
-                                    : "text-muted-foreground"
-                                }`}
-                              >
-                                {permission.replace(":", " → ").replace("_", " ")}
-                              </label>
-                              {hasPermission(selectedRole, permission) && (
-                                <Unlock className="h-3 w-3 text-success" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {isEditing && (
-                      <div className="flex space-x-2 pt-4 border-t">
-                        <Button className="bg-gradient-primary hover:opacity-90" size="sm">
-                          Save Changes
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                 ) : (
+                   <div className="space-y-6">
+                     {/* Only show permission groups that have granted permissions */}
+                     {allPermissions
+                       .filter(group => group.permissions.some(permission => hasPermission(selectedRole, permission)))
+                       .map((group) => (
+                       <div key={group.group}>
+                         <h4 className="font-medium text-foreground mb-3 flex items-center space-x-2">
+                           <Unlock className="h-4 w-4 text-success" />
+                           <span>{group.group}</span>
+                         </h4>
+                         <div className="grid grid-cols-1 gap-2 ml-6">
+                           {/* Only show permissions that are granted */}
+                           {group.permissions
+                             .filter(permission => hasPermission(selectedRole, permission))
+                             .map((permission) => (
+                             <div key={permission} className="flex items-center space-x-2">
+                               <div className="w-4 h-4 rounded-sm bg-success flex items-center justify-center">
+                                 <Unlock className="h-3 w-3 text-white" />
+                               </div>
+                               <label className="text-sm text-foreground">
+                                 {permission.replace(":", " → ").replace("_", " ")}
+                               </label>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     ))}
+                     
+                     {isEditing && profile?.role === "superadmin" && (
+                       <div className="flex space-x-2 pt-4 border-t">
+                         <Button className="bg-gradient-primary hover:opacity-90" size="sm">
+                           Save Changes
+                         </Button>
+                         <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                           Cancel
+                         </Button>
+                       </div>
+                     )}
+                   </div>
+                 )}
               </CardContent>
             </Card>
           ) : (
