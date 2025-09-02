@@ -23,10 +23,11 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const url = new URL(req.url);
-    const action = url.searchParams.get('action');
+    let action;
     
     if (req.method === 'POST') {
-      const { sessionId, sessionName, phoneNumber } = await req.json();
+      const { sessionId, sessionName, phoneNumber, action: bodyAction } = await req.json();
+      action = bodyAction;
       console.log(`WhatsApp session action: ${action}`, { sessionId, sessionName, phoneNumber });
 
       switch (action) {
@@ -218,6 +219,7 @@ serve(async (req) => {
 
     if (req.method === 'GET') {
       const sessionId = url.searchParams.get('sessionId');
+      action = url.searchParams.get('action');
       
       if (action === 'qr-code' && sessionId) {
         const qrCode = qrCodes.get(sessionId);
