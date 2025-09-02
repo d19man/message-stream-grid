@@ -12,6 +12,8 @@ interface ShareSessionDialogProps {
   trigger?: React.ReactNode;
   sessionName: string;
   onShare?: (adminId: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 // Mock admin users
@@ -21,10 +23,14 @@ const mockAdmins: User[] = [
   { id: "admin3", email: "admin3@example.com", name: "Lisa Leader", roleId: "admin", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
 ];
 
-export const ShareSessionDialog = ({ trigger, sessionName, onShare }: ShareSessionDialogProps) => {
-  const [open, setOpen] = useState(false);
+export const ShareSessionDialog = ({ trigger, sessionName, onShare, open: controlledOpen, onOpenChange }: ShareSessionDialogProps) => {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [selectedAdminId, setSelectedAdminId] = useState("");
   const { toast } = useToast();
+
+  // Use controlled or internal state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
 
   const handleShare = () => {
     if (!selectedAdminId) {
@@ -50,14 +56,11 @@ export const ShareSessionDialog = ({ trigger, sessionName, onShare }: ShareSessi
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" size="sm">
-            <Share className="h-4 w-4 mr-2" />
-            Share to Admin
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger && (
+        <DialogTrigger asChild>
+          {trigger}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-md" aria-describedby="share-session-description">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
@@ -72,7 +75,7 @@ export const ShareSessionDialog = ({ trigger, sessionName, onShare }: ShareSessi
               <span className="font-medium">Session:</span> {sessionName}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              This session will be shared with the selected admin who can then distribute it to their team members.
+              Share this session to admin's storage. The admin can then assign it to their team members (CRM/Blaster/Warmup users) as needed.
             </p>
           </div>
 

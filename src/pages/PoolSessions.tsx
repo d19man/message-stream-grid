@@ -109,6 +109,7 @@ const PoolSessions = () => {
   });
   
   const [selectedSessionForAssignment, setSelectedSessionForAssignment] = useState<Session | null>(null);
+  const [selectedSessionForSharing, setSelectedSessionForSharing] = useState<Session | null>(null);
   
   const currentUser = getCurrentUser(currentUserRole);
   
@@ -222,6 +223,19 @@ const PoolSessions = () => {
     ));
 
     setSelectedSessionForAssignment(null);
+  };
+
+  const handleShareToAdmin = (adminId: string) => {
+    if (!selectedSessionForSharing) return;
+
+    // Here you would send the session to the selected admin
+    // For now, we'll just show a toast
+    toast({
+      title: "Session Shared to Admin",
+      description: `"${selectedSessionForSharing.name}" has been shared to admin storage`,
+    });
+
+    setSelectedSessionForSharing(null);
   };
 
   const getStatusIcon = (status: string) => {
@@ -389,19 +403,13 @@ const PoolSessions = () => {
                           </DropdownMenuItem>
                           {currentUser.role.name === "Super Admin" && (
                             <>
-                              <DropdownMenuItem asChild>
-                                <div>
-                                  <ShareSessionDialog 
-                                    sessionName={session.name}
-                                    onShare={(adminId) => console.log('Shared to admin:', adminId)}
-                                    trigger={
-                                      <div className="flex items-center w-full cursor-pointer">
-                                        <Crown className="h-4 w-4 mr-2" />
-                                        Share to Admin
-                                      </div>
-                                    }
-                                  />
-                                </div>
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  setSelectedSessionForSharing(session);
+                                }}
+                              >
+                                <Crown className="h-4 w-4 mr-2" />
+                                Share to Admin
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleClearDistribution(session.id)}>
                                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -490,6 +498,16 @@ const PoolSessions = () => {
           </TabsContent>
         ))}
       </Tabs>
+
+      {/* Share to Admin Dialog */}
+      {selectedSessionForSharing && (
+        <ShareSessionDialog 
+          sessionName={selectedSessionForSharing.name}
+          onShare={handleShareToAdmin}
+          open={true}
+          onOpenChange={(open) => !open && setSelectedSessionForSharing(null)}
+        />
+      )}
 
       {/* Assign to User Dialog */}
       {selectedSessionForAssignment && (
