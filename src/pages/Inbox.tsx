@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,8 +56,16 @@ const Inbox = () => {
     }
   };
 
-  const [selectedPool, setSelectedPool] = useState<PoolType>(getDefaultPool());
+  const [selectedPool, setSelectedPool] = useState<PoolType>("CRM");
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
+
+  // Update selected pool when profile loads
+  useEffect(() => {
+    if (profile?.role) {
+      const defaultPool = getDefaultPool();
+      setSelectedPool(defaultPool);
+    }
+  }, [profile?.role]);
 
   // Mock data
   const messages: InboxMessage[] = [
