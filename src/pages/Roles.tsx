@@ -31,6 +31,60 @@ const Roles = () => {
   const [editedPermissions, setEditedPermissions] = useState<any[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
+  // Delete role function
+  const handleDeleteRole = async (roleId: string, roleName: string) => {
+    if (profile?.role !== 'superadmin') {
+      toast({
+        title: "Access Denied",
+        description: "Only superadmin can delete roles",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prevent deletion of system roles
+    if (['superadmin', 'admin', 'user'].includes(roleName)) {
+      toast({
+        title: "Cannot Delete",
+        description: "System roles cannot be deleted",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete the role "${roleName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('roles')
+        .delete()
+        .eq('id', roleId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Role "${roleName}" deleted successfully`,
+      });
+
+      // Clear selection if deleted role was selected
+      if (selectedRole?.id === roleId) {
+        setSelectedRole(null);
+      }
+
+      fetchRoles();
+    } catch (error: any) {
+      console.error('Error deleting role:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete role",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Fetch roles from database
   const fetchRoles = async () => {
     try {
@@ -317,11 +371,19 @@ const Roles = () => {
                        >
                          <Edit className="h-3 w-3" />
                        </Button>
-                       {!role.permissions?.includes("*") && (
-                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                           <Trash2 className="h-3 w-3" />
-                         </Button>
-                       )}
+                        {!role.is_system_role && profile?.role === 'superadmin' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRole(role.id, role.name);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                      </div>
                   </div>
                   <p className="text-sm text-muted-foreground">{role.description}</p>
