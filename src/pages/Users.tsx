@@ -47,7 +47,7 @@ const Users = () => {
   const { profile } = useAuth();
 
   // Check if current user can manage users
-  const canManageUsers = profile?.role === 'superadmin' || profile?.role === 'admin';
+  const { canManageUsers } = useAuth();
 
   const fetchUsers = async () => {
     if (!profile) return; // Wait for profile to load
@@ -93,7 +93,9 @@ const Users = () => {
   }, [profile?.id]);
 
   const handleDeleteUser = async (id: string) => {
-    if (!canManageUsers) {
+    const { canManageUsers: userCanManage } = useAuth();
+    
+    if (!userCanManage()) {
       toast({
         title: "Access Denied",
         description: "You don't have permission to delete users",
@@ -246,7 +248,7 @@ const Users = () => {
             }
           </p>
         </div>
-        {canManageUsers && (
+        {canManageUsers() && (
           <UserCreateDialog onSuccess={fetchUsers} />
         )}
       </div>
@@ -349,7 +351,7 @@ const Users = () => {
                   <TableHead>Role</TableHead>
                   <TableHead>Subscription</TableHead>
                   <TableHead>Last Updated</TableHead>
-                  {canManageUsers && <TableHead>Actions</TableHead>}
+                  {canManageUsers() && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -399,7 +401,7 @@ const Users = () => {
                         {new Date(user.updated_at).toLocaleDateString()}
                       </span>
                     </TableCell>
-                  {canManageUsers && (
+                  {canManageUsers() && (
                     <TableCell>
                       <div className="flex items-center space-x-1">
                         <SubscriptionDialog 

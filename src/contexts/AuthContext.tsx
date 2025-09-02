@@ -21,6 +21,14 @@ interface AuthContextType {
   changePassword: (newPassword: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   hasRole: (role: string) => boolean;
+  canManageUsers: () => boolean;
+  canManageSubscriptions: () => boolean;
+  canAccessDashboard: () => boolean;
+  canManageSessions: () => boolean;
+  canManageBroadcast: () => boolean;
+  canManageTemplates: () => boolean;
+  canManageContacts: () => boolean;
+  canViewInbox: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -138,12 +146,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { error: profileError };
         }
 
-        // Check if user has superadmin role (bypass subscription check)
-        if (profileData.role === 'superadmin') {
+        // Check if user has superadmin or admin role (bypass subscription check)
+        if (['superadmin', 'admin'].includes(profileData.role)) {
           return { error: null };
         }
 
-        // Check subscription status for non-superadmin users
+        // Check subscription status for regular users (CRM, Blaster, Warmup, User)
         const now = new Date();
         const isLifetime = profileData.subscription_type === 'lifetime';
         const isExpired = profileData.subscription_end ? now > new Date(profileData.subscription_end) : true;
@@ -154,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await supabase.auth.signOut();
           return { 
             error: { 
-              message: 'Your subscription has expired. Please contact the administrator to renew your subscription.' 
+              message: 'Your subscription has expired. Please contact your administrator to renew your subscription.' 
             } 
           };
         }
@@ -184,7 +192,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasRole = (role: string) => {
-    return profile?.role === role;
+    if (!profile) return false;
+    
+    // Exact role match
+    if (profile.role === role) return true;
+    
+    // Hierarchy-based permissions
+    if (profile.role === 'superadmin') {
+      // Superadmin has all permissions
+      return ['admin', 'user', 'crm', 'blaster', 'warmup'].includes(role);
+    }
+    
+    if (profile.role === 'admin') {
+      // Admin can manage their sub-users
+      return ['crm', 'blaster', 'warmup'].includes(role);
+    }
+    
+    return false;
+  };
+
+  const canManageUsers = () => {
+    return profile?.role === 'superadmin' || profile?.role === 'admin';
+  };
+
+  const canManageSubscriptions = () => {
+    return profile?.role === 'superadmin' || profile?.role === 'admin';
+  };
+
+  const canAccessDashboard = () => {
+    return profile?.role === 'superadmin' || profile?.role === 'admin';
+  };
+
+  const canManageSessions = () => {
+    return ['superadmin', 'admin', 'crm', 'blaster', 'warmup'].includes(profile?.role || '');
+  };
+
+  const canManageBroadcast = () => {
+    return ['superadmin', 'admin', 'blaster'].includes(profile?.role || '');
+  };
+
+  const canManageTemplates = () => {
+    return ['superadmin', 'admin', 'crm', 'blaster'].includes(profile?.role || '');
+  };
+
+  const canManageContacts = () => {
+    return ['superadmin', 'admin', 'crm'].includes(profile?.role || '');
+  };
+
+  const canViewInbox = () => {
+    return ['superadmin', 'admin', 'crm'].includes(profile?.role || '');
   };
 
   const value = {
@@ -195,7 +251,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     changePassword,
     signOut,
-    hasRole
+    hasRole,
+    canManageUsers,
+    canManageSubscriptions,
+    canAccessDashboard,
+    canManageSessions,
+    canManageBroadcast,
+    canManageTemplates,
+    canManageContacts,
+    canViewInbox
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
