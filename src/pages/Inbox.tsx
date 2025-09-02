@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   MessageSquare,
   Search,
@@ -18,13 +19,17 @@ import type { PoolType, InboxMessage } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useSessions } from "@/hooks/useSessions";
 
 const Inbox = () => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [newMessage, setNewMessage] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const { sessions, sendMessage } = useSessions();
   
   // Filter available pools based on user role
   const getAvailablePools = (): PoolType[] => {
@@ -65,6 +70,7 @@ const Inbox = () => {
 
   const [selectedPool, setSelectedPool] = useState<PoolType>("CRM");
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
+  const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
   // Fetch messages from database
   const fetchMessages = async () => {
@@ -74,14 +80,14 @@ const Inbox = () => {
       setLoading(true);
       
       // Get user's accessible sessions first
-      let sessionsQuery = supabase.from('whatsapp_sessions').select('*');
+      let sessionsQuery = supabase.from('sessions').select('*');
       
       if (profile.role === 'superadmin') {
         // Superadmin can see all sessions
       } else if (profile.role === 'admin') {
-        sessionsQuery = sessionsQuery.eq('admin_id', profile.id);
+        sessionsQuery = sessionsQuery.or(`admin_id.eq.${user!.id},user_id.eq.${user!.id}`);
       } else {
-        sessionsQuery = sessionsQuery.eq('user_id', profile.id);
+        sessionsQuery = sessionsQuery.eq('user_id', user!.id);
       }
       
       const { data: sessions, error: sessionsError } = await sessionsQuery;
@@ -119,16 +125,16 @@ const Inbox = () => {
 
   // Update selected pool when profile loads
   useEffect(() => {
-    if (profile?.role) {
+    if (profile?.role && user) {
       const defaultPool = getDefaultPool();
       setSelectedPool(defaultPool);
       fetchMessages();
     }
-  }, [profile?.role]);
+  }, [profile?.role, user?.id]);
 
   // Set up real-time subscription for new messages
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !user) return;
 
     const channel = supabase
       .channel('inbox-messages')
@@ -139,7 +145,8 @@ const Inbox = () => {
           schema: 'public',
           table: 'whatsapp_messages'
         },
-        () => {
+        (payload) => {
+          console.log('Message update received:', payload);
           fetchMessages(); // Refresh messages when there are changes
         }
       )
@@ -148,7 +155,7 @@ const Inbox = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile?.id]);
+  }, [profile?.id, user?.id]);
 
   // Define thread type
   type ThreadType = {
@@ -194,6 +201,100 @@ const Inbox = () => {
     }
     return true;
   });
+
+  // Handle sending a new message
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedThread || !selectedSession) {
+      toast({
+        title: "Error", 
+        description: selectedSession ? "Please type a message" : "Please select a session to send from",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSendingMessage(true);
+      
+      // Find the session to use for sending
+      const session = sessions.find(s => s.id === selectedSession);
+      if (!session) {
+        throw new Error("Selected session not found");
+      }
+
+      // Send message through WhatsApp backend
+      await sendMessage(selectedSession, selectedThread, newMessage.trim());
+      
+      // Auto-create contact if it doesn't exist
+      await createContactFromThread(selectedThread);
+      
+      // Clear message input
+      setNewMessage("");
+      
+      // Refresh messages to show the sent message
+      setTimeout(() => {
+        fetchMessages();
+      }, 1000);
+      
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Send Failed",
+        description: error.message || "Failed to send message",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  // Auto-create contact from phone number
+  const createContactFromThread = async (phoneNumber: string) => {
+    if (!user) return;
+    
+    try {
+      // Check if contact already exists
+      const { data: existingContact } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('phone', phoneNumber)
+        .eq('user_id', user.id)
+        .maybeSingle();
+        
+      if (existingContact) return; // Contact already exists
+      
+      // Create new contact
+      const { error } = await supabase
+        .from('contacts')
+        .insert([{
+          phone: phoneNumber,
+          name: phoneNumber, // Use phone as name initially
+          pool: selectedPool,
+          tags: ['from-chat'],
+          user_id: user.id,
+          admin_id: profile?.admin_id || null,
+        }]);
+        
+      if (error) {
+        console.error('Error creating contact:', error);
+      }
+    } catch (error) {
+      console.error('Error auto-creating contact:', error);
+    }
+  };
+
+  // Get available sessions for the selected pool
+  const getAvailableSessionsForPool = () => {
+    const poolSystemMap = {
+      'CRM': 'CRM',
+      'BLASTER': 'BLASTER', 
+      'WARMUP': 'WARMUP'
+    };
+    
+    return sessions.filter(session => session.pool === poolSystemMap[selectedPool] && session.status === 'connected');
+  };
+
+  const availableSessions = getAvailableSessionsForPool();
 
   return (
     <div className="h-[calc(100vh-200px)] animate-fade-in">
@@ -378,21 +479,66 @@ const Inbox = () => {
 
               {/* Message Input */}
               <div className="p-6 border-t border-border bg-card">
+                {/* Session Selection */}
+                <div className="mb-4">
+                  <Select value={selectedSession || ""} onValueChange={setSelectedSession}>
+                    <SelectTrigger className="w-full mb-2">
+                      <SelectValue placeholder={`Select a ${selectedPool} session to send from`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSessions.length === 0 ? (
+                        <SelectItem value="" disabled>
+                          No connected {selectedPool} sessions available
+                        </SelectItem>
+                      ) : (
+                        availableSessions.map((session) => (
+                          <SelectItem key={session.id} value={session.id}>
+                            {session.name} ({session.phone || 'No phone'})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {availableSessions.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Connect at least one {selectedPool} session to send messages
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex items-end space-x-3">
                   <div className="flex space-x-2">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" disabled>
                       <Paperclip className="h-5 w-5" />
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" disabled>
                       <Image className="h-5 w-5" />
                     </Button>
                   </div>
                   <Input
                     placeholder="Type your message..."
-                    className="flex-1 min-h-[44px] resize-none"
+                    className="flex-1 min-h-[44px]"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    disabled={sendingMessage || !selectedSession}
                   />
-                  <Button size="default" className="bg-gradient-primary hover:opacity-90 px-6">
-                    <Send className="h-4 w-4 mr-2" />
+                  <Button 
+                    size="default" 
+                    className="bg-gradient-primary hover:opacity-90 px-6"
+                    onClick={handleSendMessage}
+                    disabled={sendingMessage || !selectedSession || !newMessage.trim()}
+                  >
+                    {sendingMessage ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
                     Send
                   </Button>
                 </div>

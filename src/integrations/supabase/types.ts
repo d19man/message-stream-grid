@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      contacts: {
+        Row: {
+          admin_id: string | null
+          created_at: string
+          id: string
+          last_contact_at: string | null
+          name: string | null
+          opt_out: boolean
+          phone: string
+          pool: string
+          tags: string[]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          last_contact_at?: string | null
+          name?: string | null
+          opt_out?: boolean
+          phone: string
+          pool?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          last_contact_at?: string | null
+          name?: string | null
+          opt_out?: boolean
+          phone?: string
+          pool?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           admin_id: string | null
@@ -175,6 +217,7 @@ export type Database = {
           error_text: string | null
           id: string
           message_type: string
+          owner_user_id: string | null
           payload_json: Json
           sent_at: string | null
           session_name: string
@@ -186,6 +229,7 @@ export type Database = {
           error_text?: string | null
           id?: string
           message_type?: string
+          owner_user_id?: string | null
           payload_json: Json
           sent_at?: string | null
           session_name: string
@@ -197,31 +241,43 @@ export type Database = {
           error_text?: string | null
           id?: string
           message_type?: string
+          owner_user_id?: string | null
           payload_json?: Json
           sent_at?: string | null
           session_name?: string
           status?: string
           to_jid?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_outbox_session"
+            columns: ["session_name"]
+            isOneToOne: false
+            referencedRelation: "wa_sessions"
+            referencedColumns: ["name"]
+          },
+        ]
       }
       wa_sessions: {
         Row: {
           id: string
           last_active: string | null
           name: string
+          owner_user_id: string | null
           status: string
         }
         Insert: {
           id?: string
           last_active?: string | null
           name: string
+          owner_user_id?: string | null
           status?: string
         }
         Update: {
           id?: string
           last_active?: string | null
           name?: string
+          owner_user_id?: string | null
           status?: string
         }
         Relationships: []

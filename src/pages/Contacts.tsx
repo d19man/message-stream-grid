@@ -18,18 +18,22 @@ import {
   Tag,
   UserX,
   UserCheck,
+  Loader2,
 } from "lucide-react";
 import { ContactDialog } from "@/components/contacts/ContactDialog";
 import { ImportContactDialog, SYSTEM_TYPES } from "@/components/contacts/ImportContactDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import type { Contact, PoolType } from "@/types";
 
 const Contacts = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
   // Filter available pools based on user role
   const getAvailablePools = (): PoolType[] => {
@@ -75,137 +79,188 @@ const Contacts = () => {
     if (profile?.role) {
       const defaultPool = getDefaultPool();
       setSelectedPool(defaultPool);
+      fetchContacts();
     }
   }, [profile?.role]);
 
-  // Mock data
-  const initialContacts: Contact[] = [
-    {
-      id: "1",
-      phone: "+1234567890",
-      name: "John Doe",
-      system: "crm",
-      tags: ["customer", "vip"],
-      optOut: false,
-      lastContactAt: "2024-01-15T10:30:00Z",
-      userId: "user1",
-      createdAt: "2024-01-10T08:00:00Z",
-      updatedAt: "2024-01-15T10:30:00Z",
-    },
-    {
-      id: "2",
-      phone: "+1234567891",
-      name: "Jane Smith",
-      system: "blaster",
-      tags: ["prospect", "enterprise"],
-      optOut: false,
-      lastContactAt: "2024-01-14T15:20:00Z",
-      userId: "user1",
-      createdAt: "2024-01-12T09:00:00Z",
-      updatedAt: "2024-01-14T15:20:00Z",
-    },
-    {
-      id: "3",
-      phone: "+1234567892",
-      name: "Mike Johnson",
-      system: "crm",
-      tags: ["customer"],
-      optOut: true,
-      lastContactAt: "2024-01-13T12:15:00Z",
-      userId: "user1",
-      createdAt: "2024-01-08T10:00:00Z",
-      updatedAt: "2024-01-13T12:15:00Z",
-    },
-    {
-      id: "4",
-      phone: "+1234567893",
-      name: "Sarah Wilson",
-      system: "warmup",
-      tags: ["prospect", "lead"],
-      optOut: false,
-      lastContactAt: "2024-01-15T09:45:00Z",
-      userId: "user1",
-      createdAt: "2024-01-14T11:00:00Z",
-      updatedAt: "2024-01-15T09:45:00Z",
-    },
-    {
-      id: "5",
-      phone: "+1234567894",
-      name: "",
-      system: "blaster",
-      tags: ["cold-lead"],
-      optOut: false,
-      userId: "user1",
-      createdAt: "2024-01-15T07:00:00Z",
-      updatedAt: "2024-01-15T07:00:00Z",
-    },
-  ];
+  // Fetch contacts from database
+  const fetchContacts = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      let query = supabase.from('contacts').select('*');
+      
+      // Filter based on user role and permissions
+      if (profile?.role === 'superadmin') {
+        // Superadmin sees all contacts
+      } else if (profile?.role === 'admin') {
+        // Admin sees their own contacts and their users' contacts
+        query = query.or(`user_id.eq.${user.id},admin_id.eq.${user.id}`);
+      } else {
+        // Regular users see only their own contacts
+        query = query.eq('user_id', user.id);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
-  const [contacts, setContacts] = useState<Contact[]>(initialContacts);
+      if (error) {
+        console.error('Error fetching contacts:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch contacts",
+          variant: "destructive",
+        });
+        return;
+      }
 
-  const handleSaveContact = (contactData: Partial<Contact>) => {
-    if (contactData.id) {
-      // Edit existing contact
-      setContacts(prev => prev.map(c => 
-        c.id === contactData.id ? { ...c, ...contactData, updatedAt: new Date().toISOString() } : c
-      ));
-    } else {
-      // Create new contact
-      const newContact: Contact = {
-        id: Date.now().toString(),
-        name: contactData.name!,
-        phone: contactData.phone!,
-        system: contactData.system || "crm",
-        tags: contactData.tags!,
-        optOut: false,
-        userId: "user1",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setContacts(prev => [...prev, newContact]);
+      // Transform database contacts to match Contact interface
+      const transformedContacts: Contact[] = (data || []).map(contact => ({
+        id: contact.id,
+        phone: contact.phone,
+        name: contact.name || "",
+        system: contact.pool.toLowerCase() as "crm" | "blaster" | "warmup",
+        tags: contact.tags || [],
+        optOut: contact.opt_out,
+        lastContactAt: contact.last_contact_at,
+        userId: contact.user_id,
+        createdAt: contact.created_at,
+        updatedAt: contact.updated_at,
+      }));
+
+      setContacts(transformedContacts);
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch contacts",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleImportContacts = (importedContacts: Partial<Contact>[]) => {
-    const newContacts: Contact[] = importedContacts.map((contactData, index) => ({
-      id: (Date.now() + index).toString(),
-      name: contactData.name || "",
-      phone: contactData.phone!,
-      system: contactData.system || "crm",
-      tags: contactData.tags || [],
-      optOut: contactData.optOut || false,
-      userId: "user1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }));
+  const handleSaveContact = async (contactData: Partial<Contact>) => {
+    if (!user) return;
     
-    setContacts(prev => [...prev, ...newContacts]);
-    toast({
-      title: "Success",
-      description: `Imported ${newContacts.length} contacts successfully!`,
-    });
-  };
+    try {
+      const contactPayload = {
+        phone: contactData.phone!,
+        name: contactData.name || null,
+        pool: selectedPool,
+        tags: contactData.tags || [],
+        opt_out: contactData.optOut || false,
+        user_id: user.id,
+        admin_id: profile?.admin_id || null,
+      };
 
-  const handleDeleteContact = (id: string) => {
-    if (confirm("Are you sure you want to delete this contact?")) {
-      setContacts(prev => prev.filter(c => c.id !== id));
+      if (contactData.id) {
+        // Edit existing contact
+        const { error } = await supabase
+          .from('contacts')
+          .update(contactPayload)
+          .eq('id', contactData.id);
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Contact updated successfully!",
+        });
+      } else {
+        // Create new contact
+        const { error } = await supabase
+          .from('contacts')
+          .insert([contactPayload]);
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Success", 
+          description: "Contact created successfully!",
+        });
+      }
+      
+      // Refresh contacts list
+      fetchContacts();
+    } catch (error: any) {
+      console.error('Error saving contact:', error);
       toast({
-        title: "Success",
-        description: "Contact deleted successfully!",
+        title: "Error",
+        description: error.message || "Failed to save contact",
+        variant: "destructive",
       });
     }
   };
 
-  // Role-based filtering
-  const getAccessibleContacts = () => {
-    if (profile?.role === 'superadmin') {
-      return contacts; // Super admin sees all
+  const handleImportContacts = async (importedContacts: Partial<Contact>[]) => {
+    if (!user) return;
+    
+    try {
+      const contactsPayload = importedContacts.map(contactData => ({
+        phone: contactData.phone!,
+        name: contactData.name || null,
+        pool: contactData.system?.toUpperCase() || selectedPool,
+        tags: contactData.tags || [],
+        opt_out: contactData.optOut || false,
+        user_id: user.id,
+        admin_id: profile?.admin_id || null,
+      }));
+      
+      const { error } = await supabase
+        .from('contacts')
+        .insert(contactsPayload);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: `Imported ${contactsPayload.length} contacts successfully!`,
+      });
+      
+      // Refresh contacts list
+      fetchContacts();
+    } catch (error: any) {
+      console.error('Error importing contacts:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to import contacts",
+        variant: "destructive",
+      });
     }
-    // CRM users only see CRM contacts
-    return contacts.filter(contact => contact.system === 'crm');
   };
 
-  const accessibleContacts = getAccessibleContacts();
+  const handleDeleteContact = async (id: string) => {
+    if (confirm("Are you sure you want to delete this contact?")) {
+      try {
+        const { error } = await supabase
+          .from('contacts')
+          .delete()
+          .eq('id', id);
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Contact deleted successfully!",
+        });
+        
+        // Refresh contacts list
+        fetchContacts();
+      } catch (error: any) {
+        console.error('Error deleting contact:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to delete contact",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Role-based filtering is handled in fetchContacts query
+  const accessibleContacts = contacts;
 
   // Pool filtering
   const poolFilteredContacts = accessibleContacts.filter(contact => {
@@ -292,7 +347,7 @@ const Contacts = () => {
           <CardContent>
             <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              +12% from last month
+              In {selectedPool} pool
             </p>
           </CardContent>
         </Card>
@@ -390,7 +445,12 @@ const Contacts = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredContacts.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">Loading contacts...</span>
+            </div>
+          ) : filteredContacts.length === 0 ? (
             <div className="text-center py-8">
               <Users2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No {selectedPool} contacts found</h3>

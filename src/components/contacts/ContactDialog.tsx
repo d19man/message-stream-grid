@@ -49,12 +49,14 @@ export const ContactDialog = ({ contact, trigger, onSave }: ContactDialogProps) 
       return;
     }
 
-    onSave?.(formData);
+    // Call parent's save handler with contact data including ID for updates
+    const contactData = {
+      ...formData,
+      ...(isEdit && contact ? { id: contact.id } : {}),
+    };
+    
+    onSave?.(contactData);
     setOpen(false);
-    toast({
-      title: "Success",
-      description: `Contact ${isEdit ? 'updated' : 'created'} successfully!`,
-    });
 
     // Reset form if creating new
     if (!isEdit) {
