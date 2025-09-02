@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface User {
   id: string;
@@ -16,6 +17,7 @@ export const useUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user, profile } = useAuth();
 
   const fetchUsers = async () => {
     try {
@@ -35,10 +37,24 @@ export const useUsers = () => {
         return;
       }
 
-      setUsers((data || []).map(user => ({
+      // Filter users based on current user's role
+      let filteredUsers = (data || []).map(user => ({
         ...user,
         role: user.role as "superadmin" | "admin" | "user"
-      })));
+      }));
+
+      if (profile?.role === 'admin') {
+        // Admin only sees users assigned to them
+        filteredUsers = filteredUsers.filter(u => 
+          u.admin_id === user?.id || u.id === user?.id
+        );
+      } else if (profile?.role === 'user') {
+        // Regular users only see themselves
+        filteredUsers = filteredUsers.filter(u => u.id === user?.id);
+      }
+      // Superadmin sees all users (no filtering)
+
+      setUsers(filteredUsers);
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -56,9 +72,24 @@ export const useUsers = () => {
   };
 
   const getUsersByPool = (pool: "CRM" | "BLASTER" | "WARMUP") => {
-    // For now, return all regular users
-    // You could add a pool_type field to profiles later if needed
-    return users.filter(user => user.role === 'user');
+    // Filter users based on their role and admin relationship
+    const poolUsers = users.filter(user => {
+      // Only return regular users (not admin/superadmin)
+      if (user.role !== 'user') return false;
+      
+      // For now, return all regular users since we don't have pool-specific roles yet
+      // Later you can add a pool_type field to profiles table if needed
+      return true;
+    });
+    
+    console.log(`getUsersByPool(${pool}):`, {
+      allUsers: users,
+      poolUsers: poolUsers,
+      currentUserRole: profile?.role,
+      currentUserId: user?.id
+    });
+    
+    return poolUsers;
   };
 
   const getUserName = (userId: string) => {
@@ -70,8 +101,10 @@ export const useUsers = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (profile) {
+      fetchUsers();
+    }
+  }, [profile?.id, profile?.role]);
 
   return {
     users,
