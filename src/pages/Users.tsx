@@ -139,6 +139,7 @@ const Users = () => {
 
     // Prevent users from deleting themselves
     if (userToDelete.id === profile?.id) {
+      console.log('User trying to delete themselves');
       toast({
         title: "Error",
         description: "You cannot delete yourself",
@@ -147,21 +148,26 @@ const Users = () => {
       return;
     }
 
-    // Prevent admin from deleting other admins/superadmins
+    // Prevent admin from deleting other admins/superladmin, but allow deleting regular users
     if (profile?.role === 'admin' && ['superadmin', 'admin'].includes(userToDelete.role)) {
+      console.log('Admin trying to delete another admin/superladmin:', {
+        currentUserRole: profile.role,
+        targetUserRole: userToDelete.role
+      });
       toast({
         title: "Access Denied",
-        description: "You cannot delete admin or superadmin users",
+        description: "You cannot delete admin or superladmin users",
         variant: "destructive",
       });
       return;
     }
 
-    // Additional check: Admin can only delete users assigned to them
+    // Additional check: Admin can only delete users assigned to them (not other admins' users)
     if (profile?.role === 'admin' && userToDelete.admin_id !== profile?.id) {
       console.log('Admin trying to delete user not assigned to them:', {
         userAdminId: userToDelete.admin_id,
-        currentAdminId: profile?.id
+        currentAdminId: profile?.id,
+        userRole: userToDelete.role
       });
       toast({
         title: "Access Denied",
