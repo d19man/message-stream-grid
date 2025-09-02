@@ -251,10 +251,13 @@ const Contacts = () => {
         </div>
         <div className="flex items-center space-x-4">
           <ImportContactDialog onImport={handleImportContacts} />
-          <Button variant="outline" className="flex items-center space-x-2">
-            <Download className="h-4 w-4" />
-            <span>Export {selectedPool}</span>
-          </Button>
+          {/* Export function only for superadmin and admin */}
+          {(profile?.role === 'superadmin' || profile?.role === 'admin') && (
+            <Button variant="outline" className="flex items-center space-x-2">
+              <Download className="h-4 w-4" />
+              <span>Export {selectedPool}</span>
+            </Button>
+          )}
           <ContactDialog onSave={handleSaveContact} />
         </div>
       </div>
