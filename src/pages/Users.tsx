@@ -121,8 +121,14 @@ const Users = () => {
       return;
     }
 
-    if (profile?.role === 'admin' && ['superadmin', 'admin'].includes(userToDelete.role)) {
-      toast({ title: "Access Denied", description: "Cannot delete admin users", variant: "destructive" });
+    // Admin cannot delete superadmin or other admins (except their own subordinates)
+    if (profile?.role === 'admin' && userToDelete.role === 'superadmin') {
+      toast({ title: "Access Denied", description: "Cannot delete superadmin users", variant: "destructive" });
+      return;
+    }
+
+    if (profile?.role === 'admin' && userToDelete.role === 'admin') {
+      toast({ title: "Access Denied", description: "Cannot delete other admin users", variant: "destructive" });
       return;
     }
 
