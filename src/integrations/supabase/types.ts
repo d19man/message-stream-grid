@@ -174,6 +174,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_admin_profile: {
+        Args: { admin_user_id: string }
+        Returns: boolean
+      }
       get_current_user_admin_id: {
         Args: Record<PropertyKey, never>
         Returns: string
