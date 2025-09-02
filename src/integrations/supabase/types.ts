@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      broadcast_jobs: {
+        Row: {
+          admin_id: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          name: string
+          plan_json: Json
+          pool: string
+          started_at: string | null
+          stats: Json
+          status: string
+          target_contacts: string[]
+          template_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          admin_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          plan_json?: Json
+          pool: string
+          started_at?: string | null
+          stats?: Json
+          status?: string
+          target_contacts?: string[]
+          template_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          admin_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          plan_json?: Json
+          pool?: string
+          started_at?: string | null
+          stats?: Json
+          status?: string
+          target_contacts?: string[]
+          template_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broadcast_jobs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           admin_id: string | null
@@ -179,6 +238,45 @@ export type Database = {
           phone?: string | null
           pool?: string
           status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      templates: {
+        Row: {
+          admin_id: string | null
+          allowed_in: string[]
+          content_json: Json
+          created_at: string
+          id: string
+          kind: string
+          name: string
+          preview: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          admin_id?: string | null
+          allowed_in?: string[]
+          content_json?: Json
+          created_at?: string
+          id?: string
+          kind: string
+          name: string
+          preview?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          admin_id?: string | null
+          allowed_in?: string[]
+          content_json?: Json
+          created_at?: string
+          id?: string
+          kind?: string
+          name?: string
+          preview?: string | null
           updated_at?: string
           user_id?: string | null
         }
