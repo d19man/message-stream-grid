@@ -1,38 +1,74 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { KeyRound, RefreshCw, Copy } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { KeyRound, RefreshCw, Copy, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PairingDialogProps {
   sessionName: string;
+  sessionId: string;
   trigger?: React.ReactNode;
 }
 
-export const PairingDialog = ({ sessionName, trigger }: PairingDialogProps) => {
+export const PairingDialog = ({ sessionName, sessionId, trigger }: PairingDialogProps) => {
   const [pairingCode, setPairingCode] = useState("");
-  const [timeLeft, setTimeLeft] = useState(60);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  // Generate random 8-digit pairing code
-  const generatePairingCode = () => {
-    const code = Math.floor(10000000 + Math.random() * 90000000).toString();
-    setPairingCode(code);
-    setTimeLeft(60);
-  };
-
-  // Initialize pairing code on mount
-  useEffect(() => {
-    generatePairingCode();
-  }, []);
-
-  // Countdown timer
-  useEffect(() => {
-    if (timeLeft > 0) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
+  // Request pairing code from Baileys server
+  const requestPairingCode = async () => {
+    if (!phoneNumber.trim()) {
+      toast({
+        title: "Phone Number Required",
+        description: "Please enter your phone number",
+        variant: "destructive"
+      });
+      return;
     }
-  }, [timeLeft]);
+    
+    try {
+      setLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/whatsapp/pairing-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          phoneNumber: phoneNumber
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to request pairing code');
+      
+      const data = await response.json();
+
+      if (data.success) {
+        setPairingCode(data.pairingCode);
+        toast({
+          title: "Pairing Code Generated",
+          description: "Enter this code in your WhatsApp app",
+        });
+      } else {
+        throw new Error(data.error || 'Failed to generate pairing code');
+      }
+    } catch (error: any) {
+      console.error('Error requesting pairing code:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to request pairing code",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(pairingCode);
@@ -42,14 +78,8 @@ export const PairingDialog = ({ sessionName, trigger }: PairingDialogProps) => {
     });
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
           <Button size="sm" variant="outline">
@@ -66,48 +96,82 @@ export const PairingDialog = ({ sessionName, trigger }: PairingDialogProps) => {
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4 text-center">
-          <div className="text-sm text-muted-foreground">
+        <div className="space-y-4">
+          <div className="text-sm text-muted-foreground text-center">
             Session: <span className="font-medium">{sessionName}</span>
           </div>
           
+          {/* Phone Number Input */}
+          {!pairingCode && (
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="Enter your phone number (e.g., +628123456789)"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                disabled={loading}
+              />
+              <div className="text-xs text-muted-foreground">
+                Include country code (e.g., +62 for Indonesia)
+              </div>
+            </div>
+          )}
+
           {/* Pairing Code Display */}
-          <div className="bg-muted rounded-lg p-6">
-            <div className="text-3xl font-mono font-bold tracking-wider text-primary mb-2">
-              {pairingCode.slice(0, 4)} {pairingCode.slice(4)}
+          {pairingCode && (
+            <div className="bg-muted rounded-lg p-6 text-center">
+              <div className="text-3xl font-mono font-bold tracking-wider text-primary mb-2">
+                {pairingCode}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Enter this code in WhatsApp
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              Expires in: <span className="font-medium text-warning">{formatTime(timeLeft)}</span>
-            </div>
-          </div>
+          )}
 
           {/* Instructions */}
-          <div className="space-y-2 text-sm text-muted-foreground text-left">
+          <div className="space-y-2 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">Instructions:</p>
             <p>1. Open WhatsApp on your phone</p>
             <p>2. Go to Settings → Linked Devices</p>
             <p>3. Tap "Link a Device"</p>
             <p>4. Tap "Link with Phone Number Instead"</p>
-            <p>5. Enter the 8-digit code above</p>
+            {pairingCode && <p>5. Enter the code: <strong className="text-foreground">{pairingCode}</strong></p>}
           </div>
 
           {/* Action Buttons */}
           <div className="flex space-x-2">
-            <Button variant="outline" onClick={copyToClipboard} className="flex-1">
-              <Copy className="h-4 w-4 mr-2" />
-              Copy Code
-            </Button>
-            <Button variant="outline" onClick={generatePairingCode} className="flex-1">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              New Code
-            </Button>
+            {!pairingCode ? (
+              <Button 
+                onClick={requestPairingCode} 
+                className="w-full"
+                disabled={loading || !phoneNumber.trim()}
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <KeyRound className="h-4 w-4 mr-2" />
+                )}
+                Get Pairing Code
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={copyToClipboard} className="flex-1">
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Code
+                </Button>
+                <Button variant="outline" onClick={() => {
+                  setPairingCode("");
+                  setPhoneNumber("");
+                }} className="flex-1">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  New Code
+                </Button>
+              </>
+            )}
           </div>
-
-          {timeLeft === 0 && (
-            <div className="text-sm text-destructive">
-              Code expired. Click "New Code" to generate a fresh one.
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>

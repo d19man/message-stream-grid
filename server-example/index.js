@@ -79,9 +79,9 @@ app.post('/api/whatsapp/create', verifyAuth, async (req, res) => {
 // Connect WhatsApp session
 app.post('/api/whatsapp/connect', verifyAuth, async (req, res) => {
   try {
-    const { sessionId } = req.body;
+    const { sessionId, usePairing = false } = req.body;
     
-    console.log(`Connecting WhatsApp session: ${sessionId}`);
+    console.log(`Connecting WhatsApp session: ${sessionId}, usePairing: ${usePairing}`);
     
     // Create auth directory
     const authDir = path.join(__dirname, 'auth_sessions', sessionId);
@@ -95,13 +95,15 @@ app.post('/api/whatsapp/connect', verifyAuth, async (req, res) => {
     const sock = makeWASocket({
       auth: state,
       printQRInTerminal: false,
-      logger: { level: 'silent' }
+      logger: { level: 'silent' },
+      // Enable pairing code mode
+      browser: ['WhatsApp Business', 'Chrome', '4.0.0'],
     });
 
     // Store session
     activeSessions.set(sessionId, sock);
 
-    // Handle QR code
+    // Handle QR code and pairing
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
       
@@ -247,6 +249,44 @@ app.get('/api/whatsapp/qr/:sessionId', verifyAuth, async (req, res) => {
     }
   } catch (error) {
     console.error('Error getting QR code:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Request pairing code for session
+app.post('/api/whatsapp/pairing-code', verifyAuth, async (req, res) => {
+  try {
+    const { sessionId, phoneNumber } = req.body;
+    
+    const sock = activeSessions.get(sessionId);
+    if (!sock) {
+      return res.status(404).json({ error: 'Session not found. Please connect the session first.' });
+    }
+    
+    // Format phone number (remove all non-digits and add country code if needed)
+    const formattedNumber = phoneNumber.replace(/\D/g, '');
+    
+    // Request pairing code
+    const pairingCode = await sock.requestPairingCode(formattedNumber);
+    
+    console.log(`Pairing code for ${sessionId} (${formattedNumber}): ${pairingCode}`);
+    
+    // Update database status
+    await supabase
+      .from('sessions')
+      .update({ 
+        status: 'pairing_required',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId);
+    
+    res.json({ 
+      success: true,
+      pairingCode: pairingCode,
+      phoneNumber: formattedNumber
+    });
+  } catch (error) {
+    console.error('Error requesting pairing code:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -344,7 +344,15 @@ const Sessions = () => {
                             } />
                           )}
                           {session.status === "pairing_required" && (
-                            <PairingDialog sessionName={session.name} trigger={
+                            <PairingDialog sessionName={session.name} sessionId={session.id} trigger={
+                              <Button size="sm" variant="outline" className="flex-1">
+                                <KeyRound className="h-3 w-3 mr-1" />
+                                Pairing Code
+                              </Button>
+                            } />
+                          )}
+                          {session.status === "disconnected" && (
+                            <PairingDialog sessionName={session.name} sessionId={session.id} trigger={
                               <Button size="sm" variant="outline" className="flex-1">
                                 <KeyRound className="h-3 w-3 mr-1" />
                                 Pairing Code
