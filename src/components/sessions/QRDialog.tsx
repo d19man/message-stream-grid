@@ -22,19 +22,35 @@ export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => 
     
     try {
       setLoading(true);
-      // Generate QR code using external service
-      const qrCodeData = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=whatsapp://session/${sessionId}`;
-      setQrCode(qrCodeData);
       
-      toast({
-        title: "QR Code Ready",
-        description: "Scan the QR code with WhatsApp to connect",
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        method: 'GET',
+        body: {
+          sessionId,
+          action: 'qr-code'
+        }
       });
+
+      if (error) throw new Error(error.message);
+
+      if (data?.success && data?.qrCode) {
+        setQrCode(data.qrCode);
+        toast({
+          title: "QR Code Ready",
+          description: "Scan the QR code with WhatsApp to connect",
+        });
+      } else {
+        toast({
+          title: "QR Code Not Available",
+          description: "Please try connecting the session first.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
-      console.error('Error generating QR code:', error);
+      console.error('Error fetching QR code:', error);
       toast({
         title: "Error",
-        description: "Failed to generate QR code",
+        description: "Failed to fetch QR code",
         variant: "destructive"
       });
     } finally {

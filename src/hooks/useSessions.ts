@@ -63,19 +63,18 @@ export const useSessions = () => {
       // Create unique session name with timestamp to avoid duplicates
       const uniqueSessionName = `${sessionData.name || "Session"}_${Date.now()}`;
       
-      // Create WhatsApp session in whatsapp_sessions table
+      // Create WhatsApp session using Edge Function
       try {
-        const { error: waError } = await supabase
-          .from('whatsapp_sessions')
-          .insert({
-            id: sessionId,
-            session_name: uniqueSessionName,
-            status: 'disconnected',
-            user_id: (await supabase.auth.getUser()).data.user?.id
-          });
+        const { error: functionError } = await supabase.functions.invoke('whatsapp-session', {
+          body: {
+            sessionId: sessionId,
+            sessionName: uniqueSessionName,
+            action: 'create'
+          }
+        });
 
-        if (waError) {
-          console.error('Error creating WhatsApp session:', waError);
+        if (functionError) {
+          console.error('Error creating WhatsApp session:', functionError);
         }
       } catch (error) {
         console.error('Error creating WhatsApp session:', error);
@@ -137,35 +136,30 @@ export const useSessions = () => {
   // Connect WhatsApp session 
   const connectWhatsApp = async (sessionId: string) => {
     try {
-      // Update session status to connecting
-      const { error } = await supabase
-        .from('sessions')
-        .update({ status: 'qr_required' })
-        .eq('id', sessionId);
-
-      if (error) throw new Error('Failed to update session status');
-
-      // Update whatsapp_sessions status
-      await supabase
-        .from('whatsapp_sessions')
-        .upsert({ 
-          id: sessionId,
-          session_name: `session_${sessionId}`,
-          status: 'qr_ready',
-          last_seen: new Date().toISOString()
-        });
-
-      // Update local session status
-      setSessions(prev => prev.map(s => s.id === sessionId ? { 
-        ...s, 
-        status: "qr_required" as const
-      } : s));
-      
-      toast({
-        title: "QR Code Ready",
-        description: "Scan the QR code to connect WhatsApp",
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        body: {
+          sessionId,
+          action: 'connect'
+        }
       });
-      return true;
+
+      if (error) throw new Error(error.message);
+
+      if (data?.success) {
+        // Update local session status
+        setSessions(prev => prev.map(s => s.id === sessionId ? { 
+          ...s, 
+          status: "qr_required" as const
+        } : s));
+        
+        toast({
+          title: "Connecting",
+          description: "QR code ready for scanning",
+        });
+        return true;
+      } else {
+        throw new Error(data?.error || 'Failed to connect session');
+      }
     } catch (err: any) {
       toast({
         title: "Error",
@@ -179,40 +173,32 @@ export const useSessions = () => {
   // Disconnect WhatsApp session
   const disconnectWhatsApp = async (sessionId: string) => {
     try {
-      // Update session status to disconnected
-      const { error } = await supabase
-        .from('sessions')
-        .update({ 
-          status: 'disconnected',
-          phone: '',
-          last_seen: new Date().toLocaleString()
-        })
-        .eq('id', sessionId);
-
-      if (error) throw new Error('Failed to disconnect session');
-
-      // Update whatsapp_sessions status
-      await supabase
-        .from('whatsapp_sessions')
-        .update({ 
-          status: 'disconnected',
-          last_seen: new Date().toISOString()
-        })
-        .eq('id', sessionId);
-
-      // Update local session status
-      setSessions(prev => prev.map(s => s.id === sessionId ? { 
-        ...s, 
-        status: "disconnected" as const,
-        phone: "",
-        last_seen: "Just now"
-      } : s));
-      
-      toast({
-        title: "Disconnected",
-        description: "WhatsApp session disconnected",
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        body: {
+          sessionId,
+          action: 'disconnect'
+        }
       });
-      return true;
+
+      if (error) throw new Error(error.message);
+
+      if (data?.success) {
+        // Update local session status
+        setSessions(prev => prev.map(s => s.id === sessionId ? { 
+          ...s, 
+          status: "disconnected" as const,
+          phone: "",
+          last_seen: "Just now"
+        } : s));
+        
+        toast({
+          title: "Disconnected",
+          description: "WhatsApp session disconnected",
+        });
+        return true;
+      } else {
+        throw new Error(data?.error || 'Failed to disconnect session');
+      }
     } catch (err: any) {
       toast({
         title: "Error",
@@ -226,14 +212,17 @@ export const useSessions = () => {
   // Get QR Code for session
   const getQRCode = async (sessionId: string) => {
     try {
-      // Generate a mock QR code for demo purposes
-      const qrCodeData = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=whatsapp://session/${sessionId}`;
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        method: 'GET',
+        body: {
+          sessionId,
+          action: 'qr-code'
+        }
+      });
+
+      if (error) throw new Error(error.message);
       
-      return {
-        success: true,
-        qrCode: qrCodeData,
-        message: "QR code generated successfully"
-      };
+      return data;
     } catch (err: any) {
       toast({
         title: "Error",
@@ -247,31 +236,27 @@ export const useSessions = () => {
   // Send WhatsApp message
   const sendMessage = async (sessionId: string, to: string, message: string, messageType: string = 'text') => {
     try {
-      // Store message in whatsapp_messages table
-      const { error } = await supabase
-        .from('whatsapp_messages')
-        .insert({
-          session_id: sessionId,
-          from_number: 'session',
-          to_number: to,
-          message_text: message,
-          message_type: messageType,
-          timestamp: new Date().toISOString(),
-          is_from_me: true,
-          status: 'sent'
-        });
-
-      if (error) throw new Error('Failed to store message');
-
-      toast({
-        title: "Message Sent",
-        description: "WhatsApp message sent successfully",
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        body: {
+          sessionId,
+          to,
+          message,
+          messageType,
+          action: 'send-message'
+        }
       });
-      
-      return {
-        success: true,
-        messageId: crypto.randomUUID()
-      };
+
+      if (error) throw new Error(error.message);
+
+      if (data?.success) {
+        toast({
+          title: "Message Sent",
+          description: "WhatsApp message sent successfully",
+        });
+        return data;
+      } else {
+        throw new Error(data?.error || 'Failed to send message');
+      }
     } catch (err: any) {
       toast({
         title: "Error",

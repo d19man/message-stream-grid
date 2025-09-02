@@ -20,7 +20,7 @@ export const PairingDialog = ({ sessionName, sessionId, trigger }: PairingDialog
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  // Request pairing code from demo system
+  // Request pairing code from WhatsApp Edge Function
   const requestPairingCode = async () => {
     if (!phoneNumber.trim()) {
       toast({
@@ -34,23 +34,25 @@ export const PairingDialog = ({ sessionName, sessionId, trigger }: PairingDialog
     try {
       setLoading(true);
       
-      // Generate a mock pairing code for demo purposes
-      const mockCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      setPairingCode(mockCode);
-      
-      // Update session status
-      await supabase
-        .from('sessions')
-        .update({ 
-          status: 'pairing_required',
-          phone: phoneNumber 
-        })
-        .eq('id', sessionId);
-      
-      toast({
-        title: "Pairing Code Generated",
-        description: "Enter this code in your WhatsApp app",
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        body: {
+          sessionId,
+          phoneNumber,
+          action: 'request-pairing'
+        }
       });
+
+      if (error) throw new Error(error.message);
+
+      if (data?.success && data?.pairingCode) {
+        setPairingCode(data.pairingCode);
+        toast({
+          title: "Pairing Code Generated",
+          description: "Enter this code in your WhatsApp app",
+        });
+      } else {
+        throw new Error(data?.error || 'Failed to generate pairing code');
+      }
     } catch (error: any) {
       console.error('Error requesting pairing code:', error);
       toast({
