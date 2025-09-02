@@ -137,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('subscription_type, subscription_end, subscription_active, role, admin_id')
+          .select('subscription_type, subscription_end, subscription_active, role, admin_id, email')
           .eq('id', data.user.id)
           .single();
 
@@ -161,23 +161,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (['crm', 'blaster', 'warmup'].includes(profileData.role) && profileData.admin_id) {
           // Get admin's subscription info
+          console.log('Checking admin subscription for user:', {
+            userEmail: profileData.email,
+            userRole: profileData.role,
+            adminId: profileData.admin_id
+          });
+          
           const { data: adminProfile, error: adminError } = await supabase
             .from('profiles')
-            .select('subscription_type, subscription_end, subscription_active')
+            .select('subscription_type, subscription_end, subscription_active, email, full_name')
             .eq('id', profileData.admin_id)
             .single();
           
           if (adminError) {
             console.error('Error fetching admin profile:', adminError);
+            console.log('Admin ID being searched:', profileData.admin_id);
             await supabase.auth.signOut();
             return { 
               error: { 
-                message: 'Unable to verify subscription status. Please try again.' 
+                message: 'Unable to verify admin subscription status. Please contact your administrator.' 
               } 
             };
           }
           
-          subscriptionData = adminProfile;
+          console.log('Admin subscription data:', adminProfile);
+          subscriptionData = {
+            subscription_type: adminProfile.subscription_type,
+            subscription_end: adminProfile.subscription_end,
+            subscription_active: adminProfile.subscription_active
+          };
         }
 
         // Check subscription status
