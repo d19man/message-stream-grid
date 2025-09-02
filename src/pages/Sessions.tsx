@@ -16,6 +16,8 @@ import {
   KeyRound,
   Loader2,
   Info,
+  MessageSquare,
+  Activity,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SessionDialog } from "@/components/sessions/SessionDialog";
@@ -24,13 +26,68 @@ import { PairingDialog } from "@/components/sessions/PairingDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSessions, Session } from "@/hooks/useSessions";
 import { useAuth } from "@/contexts/AuthContext";
+import { socketClient } from "@/lib/socket-client";
 import type { PoolType } from "@/types";
+
+interface WhatsAppSession {
+  session: string;
+  status: 'qr_ready' | 'connected' | 'disconnected';
+  qr?: string;
+}
 
 const Sessions = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const { sessions, loading, createSession, deleteSession, updateSession, connectWhatsApp, disconnectWhatsApp, getQRCode } = useSessions();
+  const [whatsappSessions, setWhatsappSessions] = useState<Map<string, WhatsAppSession>>(new Map());
+  const [backendConnected, setBackendConnected] = useState(false);
+
+  // Initialize Socket.io connection for WhatsApp backend
+  useEffect(() => {
+    const socket = socketClient.connect();
+    
+    socket.on('connect', () => {
+      setBackendConnected(true);
+      console.log('Connected to WhatsApp backend');
+    });
+
+    socket.on('disconnect', () => {
+      setBackendConnected(false);
+      console.log('Disconnected from WhatsApp backend');
+    });
+    
+    socketClient.onQRCode((data) => {
+      console.log('Received QR code:', data);
+      setWhatsappSessions(prev => new Map(prev.set(data.session, {
+        session: data.session,
+        status: 'qr_ready',
+        qr: data.qr
+      })));
+      toast({
+        title: "QR Code Ready",
+        description: `Scan QR code to connect ${data.session}`,
+      });
+    });
+    
+    socketClient.onStatusUpdate((data) => {
+      console.log('Status update:', data);
+      setWhatsappSessions(prev => new Map(prev.set(data.session, {
+        session: data.session,
+        status: data.status as any,
+      })));
+      toast({
+        title: "WhatsApp Status Update",
+        description: `${data.session}: ${data.status}`,
+      });
+    });
+    
+    return () => {
+      socketClient.offQRCode();
+      socketClient.offStatusUpdate();
+      socketClient.disconnect();
+    };
+  }, [toast]);
 
   // Filter available pools based on user role
   const getAvailablePools = (): PoolType[] => {
@@ -129,6 +186,48 @@ const Sessions = () => {
     navigate("/broadcast");
   };
 
+  const sendTestMessage = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/wa/device1/sendText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jid: '6281234567890@s.whatsapp.net', // Replace with actual test number
+          text: 'Hello from Baileys WhatsApp Integration!'
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.ok) {
+        toast({
+          title: "Message Sent",
+          description: "Test message sent successfully!",
+        });
+      } else {
+        throw new Error(result.error || 'Failed to send message');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send message",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getWhatsAppStatus = (sessionName: string) => {
+    const waSession = whatsappSessions.get('device1'); // Default session
+    return waSession?.status || 'disconnected';
+  };
+
+  const getWhatsAppQR = (sessionName: string) => {
+    const waSession = whatsappSessions.get('device1');
+    return waSession?.qr;
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "connected":
@@ -205,6 +304,10 @@ const Sessions = () => {
           <p className="text-muted-foreground">Manage your WhatsApp sessions across different pools</p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={sendTestMessage}>
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Test Message
+          </Button>
           <Button variant="outline" onClick={handleNewCampaign}>
             <Send className="h-4 w-4 mr-2" />
             New Campaign
@@ -212,6 +315,57 @@ const Sessions = () => {
           <SessionDialog onSave={handleSaveSession} />
         </div>
       </div>
+
+      {/* WhatsApp Backend Status */}
+      <Card className="border-l-4 border-l-primary">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Activity className="h-5 w-5" />
+            <span>WhatsApp Backend Status</span>
+            <Badge variant={backendConnected ? 'default' : 'destructive'} className="ml-auto">
+              {backendConnected ? 'Connected' : 'Disconnected'}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Badge variant={getWhatsAppStatus('device1') === 'connected' ? 'default' : 'secondary'}>
+                  {getWhatsAppStatus('device1')}
+                </Badge>
+                <span className="text-sm text-muted-foreground">Device 1 (Baileys)</span>
+              </div>
+              
+              {getWhatsAppStatus('device1') === 'connected' && (
+                <div className="flex items-center space-x-1 text-sm text-success">
+                  <Wifi className="h-4 w-4" />
+                  <span>WhatsApp Connected</span>
+                </div>
+              )}
+            </div>
+            
+            {getWhatsAppStatus('device1') === 'qr_ready' && getWhatsAppQR('device1') && (
+              <div className="flex items-center space-x-4">
+                <img 
+                  src={getWhatsAppQR('device1')} 
+                  alt="WhatsApp QR Code" 
+                  className="w-20 h-20 border rounded"
+                />
+                <div className="text-sm text-muted-foreground">
+                  Scan with WhatsApp
+                </div>
+              </div>
+            )}
+            
+            {getWhatsAppStatus('device1') === 'disconnected' && (
+              <div className="text-sm text-muted-foreground">
+                Waiting for connection...
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Info Banner for Users */}
       {profile?.role !== "superadmin" && (
