@@ -85,7 +85,7 @@ const Broadcast = () => {
       // Update existing campaign
       setJobs(prev => prev.map(job => 
         job.id === editingCampaign.id 
-          ? { ...job, ...campaignData, updatedAt: new Date().toISOString() }
+          ? { ...job, ...campaignData, updated_at: new Date().toISOString() }
           : job
       ));
       setEditingCampaign(null);
@@ -104,9 +104,9 @@ const Broadcast = () => {
         status: campaignData.status!,
         plan_json: campaignData.plan_json!,
         stats: campaignData.stats!,
-        userId: "user1",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        user_id: "user1",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       setJobs(prev => [...prev, newCampaign]);
       toast({
@@ -151,8 +151,8 @@ const Broadcast = () => {
         return {
           ...job,
           status: newStatus as BroadcastStatus,
-          updatedAt: new Date().toISOString(),
-          ...(action === "start" && { startedAt: new Date().toISOString() })
+          updated_at: new Date().toISOString(),
+          ...(action === "start" && { started_at: new Date().toISOString() })
         };
       }
       return job;
@@ -437,15 +437,15 @@ const Broadcast = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Sessions:</span>
-                      <span>{job.planJson.sessions.length}</span>
+                      <span>{job.plan_json.sessions.length}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Delay:</span>
-                      <span>{job.planJson.delayMin}-{job.planJson.delayMax}s</span>
+                      <span>{job.plan_json.delayMin}-{job.plan_json.delayMax}s</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Started:</span>
-                      <span>{job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : "Not started"}</span>
+                      <span>{job.started_at ? new Date(job.started_at).toLocaleTimeString() : "Not started"}</span>
                     </div>
                   </div>
                 </div>

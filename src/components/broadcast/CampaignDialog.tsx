@@ -47,8 +47,8 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
       setFormData({
         name: editingCampaign.name,
         pool: editingCampaign.pool,
-        template_id: editingCampaign.template_id,
-        target_contacts: editingCampaign.target_contacts || [],
+        templateId: editingCampaign.template_id || "",
+        targetContacts: editingCampaign.target_contacts || [],
         manualPhones: [],
         manualPhoneText: "",
         selectedTags: [],
@@ -90,9 +90,9 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
 
   // Mock data - in real app, these would come from API
   const templates: Template[] = [
-    { id: "1", name: "Welcome Message", kind: "text", allowedIn: ["CRM", "WARMUP"], contentJson: { text: "Hello {{name}}!" }, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "2", name: "Product Promo", kind: "image", allowedIn: ["BLASTER"], contentJson: { mediaUrl: "", caption: "50% OFF!" }, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "3", name: "Survey Request", kind: "button", allowedIn: ["CRM", "BLASTER"], contentJson: { text: "Please rate us", buttons: [] }, userId: "1", createdAt: "", updatedAt: "" },
+    { id: "1", name: "Welcome Message", kind: "text", allowed_in: ["CRM", "WARMUP"], content_json: { text: "Hello {{name}}!" }, user_id: "1", created_at: "", updated_at: "" },
+    { id: "2", name: "Product Promo", kind: "image", allowed_in: ["BLASTER"], content_json: { mediaUrl: "", caption: "50% OFF!" }, user_id: "1", created_at: "", updated_at: "" },
+    { id: "3", name: "Survey Request", kind: "button", allowed_in: ["CRM", "BLASTER"], content_json: { text: "Please rate us", buttons: [] }, user_id: "1", created_at: "", updated_at: "" },
   ];
 
   const contacts: Contact[] = [
@@ -161,10 +161,10 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
     const campaignData: Partial<BroadcastJob> = {
       name: formData.name,
       pool: formData.pool,
-      templateId: formData.templateId,
-      targetContacts: allTargetContacts,
+      template_id: formData.templateId,
+      target_contacts: allTargetContacts,
       status: "draft",
-      planJson: {
+      plan_json: {
         delayMin: formData.delayMin,
         delayMax: formData.delayMax,
         sessions: formData.sessions,
@@ -291,7 +291,7 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
   };
 
   const getAvailableTemplates = () => {
-    return templates.filter(t => formData.pool ? t.allowedIn.includes(formData.pool) : true);
+    return templates.filter(t => formData.pool ? t.allowed_in.includes(formData.pool) : true);
   };
 
   const getAvailableSessions = () => {

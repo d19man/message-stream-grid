@@ -38,7 +38,7 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
       case "text":
         return (
           <div className="bg-accent/20 rounded-lg p-4">
-            <p className="whitespace-pre-wrap">{template.contentJson.text}</p>
+            <p className="whitespace-pre-wrap">{template.content_json.text}</p>
           </div>
         );
 
@@ -46,9 +46,9 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
         return (
           <div className="space-y-3">
             <div className="bg-gradient-accent rounded-lg aspect-video flex items-center justify-center">
-              {template.contentJson.mediaUrl ? (
+              {template.content_json.mediaUrl ? (
                 <img 
-                  src={template.contentJson.mediaUrl} 
+                  src={template.content_json.mediaUrl}
                   alt="Template preview"
                   className="max-w-full max-h-full object-contain rounded-lg"
                   onError={(e) => {
@@ -62,9 +62,9 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
                 <p className="text-sm">Image Preview</p>
               </div>
             </div>
-            {template.contentJson.caption && (
+            {template.content_json.caption && (
               <div className="bg-accent/20 rounded-lg p-3">
-                <p className="text-sm">{template.contentJson.caption}</p>
+                <p className="text-sm">{template.content_json.caption}</p>
               </div>
             )}
           </div>
@@ -84,9 +84,9 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
                 <span className="text-sm text-muted-foreground">0:15</span>
               </div>
             </div>
-            {template.contentJson.caption && (
+            {template.content_json.caption && (
               <div className="bg-accent/20 rounded-lg p-3">
-                <p className="text-sm">{template.contentJson.caption}</p>
+                <p className="text-sm">{template.content_json.caption}</p>
               </div>
             )}
           </div>
@@ -96,9 +96,9 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
         return (
           <div className="space-y-3">
             <div className="bg-accent/20 rounded-lg p-4">
-              <p className="whitespace-pre-wrap mb-3">{template.contentJson.text}</p>
+              <p className="whitespace-pre-wrap mb-3">{template.content_json.text}</p>
               <div className="space-y-2">
-                {template.contentJson.buttons?.map((button: any, index: number) => (
+                {template.content_json.buttons?.map((button: any, index: number) => (
                   <Button
                     key={button.id || index}
                     variant="outline"
@@ -118,9 +118,9 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
         return (
           <div className="space-y-3">
             <div className="bg-gradient-accent rounded-lg aspect-video flex items-center justify-center mb-3">
-              {template.contentJson.mediaUrl ? (
+              {template.content_json.mediaUrl ? (
                 <img 
-                  src={template.contentJson.mediaUrl} 
+                  src={template.content_json.mediaUrl}
                   alt="Template preview"
                   className="max-w-full max-h-full object-contain rounded-lg"
                   onError={(e) => {
@@ -135,9 +135,9 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
               </div>
             </div>
             <div className="bg-accent/20 rounded-lg p-4">
-              <p className="whitespace-pre-wrap mb-3">{template.contentJson.text}</p>
+              <p className="whitespace-pre-wrap mb-3">{template.content_json.text}</p>
               <div className="space-y-2">
-                {template.contentJson.buttons?.map((button: any, index: number) => (
+                {template.content_json.buttons?.map((button: any, index: number) => (
                   <Button
                     key={button.id || index}
                     variant="outline"
@@ -190,7 +190,7 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
               </div>
             </div>
             <div className="flex flex-wrap gap-1">
-              {template.allowedIn.map((pool) => (
+              {template.allowed_in.map((pool) => (
                 <Badge
                   key={pool}
                   variant="secondary"
@@ -209,7 +209,7 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
           </div>
 
           {/* Variables Info */}
-          {(template.contentJson.text || template.contentJson.caption) && (
+          {(template.content_json.text || template.content_json.caption) && (
             <div>
               <h4 className="font-medium mb-2">Variables</h4>
               <div className="bg-muted rounded-lg p-3">
@@ -226,11 +226,11 @@ export const TemplatePreviewDialog = ({ template, trigger }: TemplatePreviewDial
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">Created</p>
-              <p>{new Date(template.createdAt).toLocaleDateString()}</p>
+              <p>{new Date(template.created_at).toLocaleDateString()}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Last Updated</p>
-              <p>{new Date(template.updatedAt).toLocaleDateString()}</p>
+              <p>{new Date(template.updated_at).toLocaleDateString()}</p>
             </div>
           </div>
         </div>
