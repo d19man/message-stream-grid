@@ -18,6 +18,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { socketManager } from "@/lib/socket";
+import SubscriptionStatus from "@/components/subscriptions/SubscriptionStatus";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -279,7 +280,7 @@ const Dashboard = () => {
       </Card>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className={`shadow-card transition-all duration-300 ${liveViewActive ? 'ring-2 ring-primary/20' : ''}`}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -322,6 +323,8 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        <SubscriptionStatus />
 
         <Card className="shadow-card">
           <CardHeader>

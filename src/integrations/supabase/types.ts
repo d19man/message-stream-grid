@@ -21,6 +21,12 @@ export type Database = {
           full_name: string | null
           id: string
           role: Database["public"]["Enums"]["app_role"]
+          subscription_active: boolean | null
+          subscription_end: string | null
+          subscription_start: string | null
+          subscription_type:
+            | Database["public"]["Enums"]["subscription_type"]
+            | null
           updated_at: string
         }
         Insert: {
@@ -29,6 +35,12 @@ export type Database = {
           full_name?: string | null
           id: string
           role?: Database["public"]["Enums"]["app_role"]
+          subscription_active?: boolean | null
+          subscription_end?: string | null
+          subscription_start?: string | null
+          subscription_type?:
+            | Database["public"]["Enums"]["subscription_type"]
+            | null
           updated_at?: string
         }
         Update: {
@@ -37,6 +49,12 @@ export type Database = {
           full_name?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          subscription_active?: boolean | null
+          subscription_end?: string | null
+          subscription_start?: string | null
+          subscription_type?:
+            | Database["public"]["Enums"]["subscription_type"]
+            | null
           updated_at?: string
         }
         Relationships: []
@@ -80,9 +98,23 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_subscription_active: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "superadmin" | "admin" | "user"
+      subscription_type:
+        | "lifetime"
+        | "trial_1_day"
+        | "trial_3_days"
+        | "trial_5_days"
+        | "1_month"
+        | "2_months"
+        | "3_months"
+        | "6_months"
+        | "1_year"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -211,6 +243,17 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["superadmin", "admin", "user"],
+      subscription_type: [
+        "lifetime",
+        "trial_1_day",
+        "trial_3_days",
+        "trial_5_days",
+        "1_month",
+        "2_months",
+        "3_months",
+        "6_months",
+        "1_year",
+      ],
     },
   },
 } as const

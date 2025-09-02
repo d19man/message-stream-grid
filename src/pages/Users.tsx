@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,145 +15,179 @@ import {
   UserX,
   Crown,
   Mail,
+  Calendar
 } from "lucide-react";
-import { UserDialog } from "@/components/users/UserDialog";
 import { useToast } from "@/hooks/use-toast";
-import type { User, Role } from "@/types";
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import SubscriptionDialog from '@/components/subscriptions/SubscriptionDialog';
+
+interface User {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: 'superadmin' | 'admin' | 'user';
+  subscription_type: string | null;
+  subscription_start: string | null;
+  subscription_end: string | null;
+  subscription_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 const Users = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { profile } = useAuth();
 
-  // Mock data
-  const roles: Role[] = [
-    {
-      id: "1",
-      name: "Super Admin",
-      permissions: ["*"],
-      description: "Full system access",
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: "2024-01-01T00:00:00Z",
-    },
-    {
-      id: "2",
-      name: "Admin",
-      permissions: ["manage:session", "view:session", "manage:broadcast", "view:broadcast", "manage:template", "view:template"],
-      description: "System administrator",
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: "2024-01-01T00:00:00Z",
-    },
-    {
-      id: "3",
-      name: "Operator",
-      permissions: ["view:session", "view:broadcast", "manage:inbox:crm", "view:inbox:crm"],
-      description: "Basic operator access",
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: "2024-01-01T00:00:00Z",
-    },
-  ];
+  // Check if current user is superadmin
+  const isSuperAdmin = profile?.role === 'superadmin';
 
-  const initialUsers: User[] = [
-    {
-      id: "1",
-      email: "admin@company.com",
-      name: "System Admin",
-      roleId: "1",
-      role: roles[0],
-      isActive: true,
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: "2024-01-15T10:00:00Z",
-    },
-    {
-      id: "2",
-      email: "manager@company.com",
-      name: "Marketing Manager",
-      roleId: "2",
-      role: roles[1],
-      isActive: true,
-      createdAt: "2024-01-05T00:00:00Z",
-      updatedAt: "2024-01-14T15:30:00Z",
-    },
-    {
-      id: "3",
-      email: "operator1@company.com",
-      name: "John Operator",
-      roleId: "3",
-      role: roles[2],
-      isActive: true,
-      createdAt: "2024-01-10T00:00:00Z",
-      updatedAt: "2024-01-15T09:20:00Z",
-    },
-    {
-      id: "4",
-      email: "operator2@company.com",
-      name: "Jane Operator",
-      roleId: "3",
-      role: roles[2],
-      isActive: false,
-      createdAt: "2024-01-12T00:00:00Z",
-      updatedAt: "2024-01-13T11:45:00Z",
-    },
-  ];
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  const [users, setUsers] = useState<User[]>(initialUsers);
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch users",
+          variant: "destructive",
+        });
+        return;
+      }
 
-  const handleSaveUser = (userData: Partial<User>) => {
-    if (userData.id) {
-      // Edit existing user
-      setUsers(prev => prev.map(u => 
-        u.id === userData.id ? { ...u, ...userData, updatedAt: new Date().toISOString() } : u
-      ));
-    } else {
-      // Create new user
-      const newUser: User = {
-        id: Date.now().toString(),
-        email: userData.email!,
-        name: userData.name!,
-        roleId: userData.roleId!,
-        role: userData.role!,
-        isActive: userData.isActive!,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setUsers(prev => [...prev, newUser]);
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch users",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeleteUser = (id: string) => {
-    if (confirm("Are you sure you want to delete this user?")) {
-      setUsers(prev => prev.filter(u => u.id !== id));
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleDeleteUser = async (id: string) => {
+    if (!isSuperAdmin) {
       toast({
-        title: "Success",
-        description: "User deleted successfully!",
+        title: "Access Denied",
+        description: "Only superadmins can delete users",
+        variant: "destructive",
       });
+      return;
+    }
+
+    if (confirm("Are you sure you want to delete this user?")) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          toast({
+            title: "Error",
+            description: "Failed to delete user",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        setUsers(prev => prev.filter(u => u.id !== id));
+        toast({
+          title: "Success",
+          description: "User deleted successfully!",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete user",
+          variant: "destructive",
+        });
+      }
     }
   };
 
   // Filter users
   const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.role?.name.toLowerCase().includes(searchQuery.toLowerCase())
+    user.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const stats = {
     total: users.length,
-    active: users.filter(u => u.isActive).length,
-    admins: users.filter(u => u.role?.name.includes("Admin")).length,
-    operators: users.filter(u => u.role?.name === "Operator").length,
+    active: users.filter(u => u.subscription_active || u.role === 'superadmin').length,
+    admins: users.filter(u => u.role === 'admin' || u.role === 'superadmin').length,
+    subscribed: users.filter(u => u.subscription_active).length,
   };
 
-  const getRoleIcon = (roleName: string) => {
-    if (roleName.includes("Super")) return <Crown className="h-4 w-4 text-yellow-500" />;
-    if (roleName.includes("Admin")) return <Shield className="h-4 w-4 text-blue-500" />;
+  const getRoleIcon = (role: string) => {
+    if (role === 'superadmin') return <Crown className="h-4 w-4 text-yellow-500" />;
+    if (role === 'admin') return <Shield className="h-4 w-4 text-blue-500" />;
     return <Users2 className="h-4 w-4 text-gray-500" />;
   };
 
-  const getRoleBadgeColor = (roleName: string) => {
-    if (roleName.includes("Super")) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-    if (roleName.includes("Admin")) return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+  const getRoleBadgeColor = (role: string) => {
+    if (role === 'superadmin') return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+    if (role === 'admin') return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
     return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
   };
+
+  const getSubscriptionStatus = (user: User) => {
+    if (user.role === 'superadmin') {
+      return <Badge className="bg-gold text-gold-foreground text-xs">Super Admin</Badge>;
+    }
+    
+    if (!user.subscription_type) {
+      return <Badge variant="secondary" className="text-xs">No Subscription</Badge>;
+    }
+    
+    if (user.subscription_type === 'lifetime') {
+      return <Badge className="bg-purple-100 text-purple-800 text-xs">Lifetime</Badge>;
+    }
+    
+    const now = new Date();
+    const endDate = user.subscription_end ? new Date(user.subscription_end) : null;
+    const isExpired = endDate ? now > endDate : false;
+    
+    if (isExpired) {
+      return <Badge variant="destructive" className="text-xs">Expired</Badge>;
+    }
+    
+    if (user.subscription_active) {
+      const daysLeft = endDate ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      return (
+        <Badge className="bg-success text-success-foreground text-xs">
+          Active {daysLeft ? `(${daysLeft}d left)` : ''}
+        </Badge>
+      );
+    }
+    
+    return <Badge variant="secondary" className="text-xs">Inactive</Badge>;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading users...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -161,9 +195,14 @@ const Users = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Users</h1>
-          <p className="text-muted-foreground">Manage system users and their access</p>
+          <p className="text-muted-foreground">Manage system users and their subscriptions</p>
         </div>
-        <UserDialog roles={roles} onSave={handleSaveUser} />
+        {isSuperAdmin && (
+          <Button onClick={() => window.location.href = '/login'} className="bg-gradient-primary">
+            <Plus className="w-4 h-4 mr-2" />
+            Create User
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -183,13 +222,13 @@ const Users = () => {
 
         <Card className="shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
             <UserCheck className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">{stats.active}</div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((stats.active / stats.total) * 100)}% active
+              {stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}% active
             </p>
           </CardContent>
         </Card>
@@ -209,13 +248,13 @@ const Users = () => {
 
         <Card className="shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Operators</CardTitle>
-            <Users2 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Subscribed</CardTitle>
+            <Calendar className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.operators}</div>
+            <div className="text-2xl font-bold text-success">{stats.subscribed}</div>
             <p className="text-xs text-muted-foreground">
-              Regular operators
+              Active subscriptions
             </p>
           </CardContent>
         </Card>
@@ -224,15 +263,15 @@ const Users = () => {
       {/* Search */}
       <Card className="shadow-card">
         <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users by name, email, or role..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search users by name, email, or role..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
         </CardContent>
       </Card>
 
@@ -262,9 +301,9 @@ const Users = () => {
                   <TableHead>User</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Subscription</TableHead>
                   <TableHead>Last Updated</TableHead>
-                  <TableHead>Actions</TableHead>
+                  {isSuperAdmin && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -274,11 +313,11 @@ const Users = () => {
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
                           <span className="text-xs font-semibold text-primary-foreground">
-                            {user.name.charAt(0)}
+                            {(user.full_name || user.email).charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium">{user.name}</p>
+                          <p className="font-medium">{user.full_name || 'No name'}</p>
                         </div>
                       </div>
                     </TableCell>
@@ -290,55 +329,46 @@ const Users = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        {getRoleIcon(user.role?.name || "")}
+                        {getRoleIcon(user.role)}
                         <Badge
                           variant="secondary"
-                          className={`text-xs ${getRoleBadgeColor(user.role?.name || "")}`}
+                          className={`text-xs ${getRoleBadgeColor(user.role)}`}
                         >
-                          {user.role?.name}
+                          {user.role}
                         </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
-                      {user.isActive ? (
-                        <Badge className="bg-success text-success-foreground text-xs">
-                          <UserCheck className="h-3 w-3 mr-1" />
-                          Active
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          <UserX className="h-3 w-3 mr-1" />
-                          Inactive
-                        </Badge>
-                      )}
+                      {getSubscriptionStatus(user)}
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">
-                        {new Date(user.updatedAt).toLocaleDateString()}
+                        {new Date(user.updated_at).toLocaleDateString()}
                       </span>
                     </TableCell>
-                    <TableCell>
-                    <div className="flex items-center space-x-1">
-                      <UserDialog 
-                        user={user}
-                        roles={roles}
-                        onSave={handleSaveUser}
-                        trigger={
-                          <Button variant="ghost" size="sm">
-                            <Edit className="h-3 w-3" />
+                    {isSuperAdmin && (
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <SubscriptionDialog 
+                            user={user}
+                            onSuccess={fetchUsers}
+                            trigger={
+                              <Button variant="ghost" size="sm">
+                                <Calendar className="h-3 w-3" />
+                              </Button>
+                            }
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteUser(user.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
                           </Button>
-                        }
-                      />
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    </TableCell>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

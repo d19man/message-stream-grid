@@ -113,11 +113,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    // First, attempt to sign in
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     });
-    return { error };
+
+    if (error) {
+      return { error };
+    }
+
+    // Check subscription status after successful login
+    if (data.user) {
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('subscription_type, subscription_end, subscription_active, role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          return { error: profileError };
+        }
+
+        // Check if user has superadmin role (bypass subscription check)
+        if (profileData.role === 'superadmin') {
+          return { error: null };
+        }
+
+        // Check subscription status for non-superadmin users
+        const now = new Date();
+        const isLifetime = profileData.subscription_type === 'lifetime';
+        const isExpired = profileData.subscription_end ? now > new Date(profileData.subscription_end) : true;
+        const hasActiveSubscription = profileData.subscription_active && (isLifetime || !isExpired);
+
+        if (!hasActiveSubscription) {
+          // Sign out the user immediately
+          await supabase.auth.signOut();
+          return { 
+            error: { 
+              message: 'Your subscription has expired. Please contact the administrator to renew your subscription.' 
+            } 
+          };
+        }
+      } catch (err) {
+        console.error('Error checking subscription:', err);
+        await supabase.auth.signOut();
+        return { 
+          error: { 
+            message: 'Unable to verify subscription status. Please try again.' 
+          } 
+        };
+      }
+    }
+
+    return { error: null };
   };
 
   const changePassword = async (newPassword: string) => {
