@@ -105,16 +105,16 @@ const Users = () => {
   }, [profile?.id]);
 
   const handleDeleteUser = async (id: string) => {
-    const { canManageUsers: userCanManage } = useAuth();
+    const { canManageUsers } = useAuth();
     
     console.log('Delete user attempt:', {
       currentUserId: profile?.id,
       currentUserRole: profile?.role,
       targetUserId: id,
-      canManageUsers: userCanManage()
+      canManageUsers: canManageUsers()
     });
     
-    if (!userCanManage()) {
+    if (!canManageUsers()) {
       toast({
         title: "Access Denied",
         description: "You don't have permission to delete users",
