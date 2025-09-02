@@ -174,6 +174,23 @@ const PoolSessions = () => {
     });
   };
 
+  const handleClearDistribution = (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    // Reset session assignment
+    setSessions(prev => prev.map(s => 
+      s.id === sessionId 
+        ? { ...s, userId: "", status: "disconnected", phone: "", lastSeen: "Never" }
+        : s
+    ));
+
+    toast({
+      title: "Distribution Cleared",
+      description: `Session "${session.name}" has been cleared and is ready for admin distribution.`
+    });
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "connected": return <div className="w-2 h-2 bg-green-500 rounded-full" />;
@@ -297,20 +314,26 @@ const PoolSessions = () => {
                             Reconnect
                           </DropdownMenuItem>
                           {currentUser.role.name === "Super Admin" && (
-                            <DropdownMenuItem asChild>
-                              <div>
-                                <ShareSessionDialog 
-                                  sessionName={session.name}
-                                  onShare={(adminId) => console.log('Shared to admin:', adminId)}
-                                  trigger={
-                                    <div className="flex items-center w-full cursor-pointer">
-                                      <Crown className="h-4 w-4 mr-2" />
-                                      Share to Admin
-                                    </div>
-                                  }
-                                />
-                              </div>
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuItem asChild>
+                                <div>
+                                  <ShareSessionDialog 
+                                    sessionName={session.name}
+                                    onShare={(adminId) => console.log('Shared to admin:', adminId)}
+                                    trigger={
+                                      <div className="flex items-center w-full cursor-pointer">
+                                        <Crown className="h-4 w-4 mr-2" />
+                                        Share to Admin
+                                      </div>
+                                    }
+                                  />
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleClearDistribution(session.id)}>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Clear Distribution
+                              </DropdownMenuItem>
+                            </>
                           )}
                           {currentUser.role.name === "Admin" && (
                             <DropdownMenuItem asChild>
