@@ -59,65 +59,29 @@ const UserCreateDialog: React.FC<UserCreateDialogProps> = ({ trigger, onSuccess 
     setLoading(true);
 
     try {
-      // Create the user account using Supabase Admin API
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        user_metadata: {
-          full_name: fullName
-        },
-        email_confirm: true
+      // Call the edge function to create user
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email,
+          password,
+          fullName,
+          role
+        }
       });
 
-      if (authError) {
-        setError(`Error creating user: ${authError.message}`);
+      if (error) {
+        setError(`Error creating user: ${error.message}`);
         setLoading(false);
         return;
       }
 
-      if (!authData.user) {
-        setError('Failed to create user');
+      if (!data.success) {
+        setError(data.error || 'Failed to create user');
         setLoading(false);
         return;
       }
 
-      // Update the profile with the selected role and admin_id
-      const updateData: any = { 
-        role: role,
-        full_name: fullName 
-      };
-
-      // Set admin_id if current user is admin (for their sub-users)
-      if (profile?.role === 'admin' && ['crm', 'blaster', 'warmup'].includes(role)) {
-        updateData.admin_id = profile.id;
-      }
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', authData.user.id);
-
-      if (profileError) {
-        setError(`Error setting user role: ${profileError.message}`);
-        setLoading(false);
-        return;
-      }
-
-      const userData = {
-        id: authData.user.id,
-        email: email,
-        full_name: fullName,
-        role: role,
-        admin_id: profile?.role === 'admin' && ['crm', 'blaster', 'warmup'].includes(role) ? profile.id : null,
-        subscription_type: null,
-        subscription_start: null,
-        subscription_end: null,
-        subscription_active: false,
-        created_at: authData.user.created_at,
-        updated_at: new Date().toISOString()
-      };
-
-      setCreatedUser(userData);
+      setCreatedUser(data.user);
       setSuccess(`User created successfully!`);
       
       toast({

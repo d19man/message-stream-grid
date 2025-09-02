@@ -1,1 +1,7 @@
 project_id = "fkviagopdmfytphpwtha"
+
+[functions.save-api-key]
+verify_jwt = true
+
+[functions.create-user]
+verify_jwt = true
