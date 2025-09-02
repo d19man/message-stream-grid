@@ -295,6 +295,11 @@ const Broadcast = () => {
     { total: 0, sent: 0, failed: 0, pending: 0 }
   );
 
+  // Calculate success and failure rates safely
+  const successRate = totalStats.total > 0 ? Math.round((totalStats.sent / totalStats.total) * 100) : 0;
+  const failureRate = totalStats.total > 0 ? Math.round((totalStats.failed / totalStats.total) * 100) : 0;
+  const completionRate = totalStats.total > 0 ? Math.round(((totalStats.sent + totalStats.failed) / totalStats.total) * 100) : 0;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -327,7 +332,7 @@ const Broadcast = () => {
           <CardContent>
             <div className="text-2xl font-bold">{totalStats.total.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {filteredJobs.length} campaign{filteredJobs.length !== 1 ? 's' : ''} ({availablePools.join(', ')})
+              {filteredJobs.length} campaign{filteredJobs.length !== 1 ? 's' : ''} • {availablePools.join(', ')} pool{availablePools.length !== 1 ? 's' : ''}
             </p>
           </CardContent>
         </Card>
@@ -340,7 +345,7 @@ const Broadcast = () => {
           <CardContent>
             <div className="text-2xl font-bold text-success">{totalStats.sent.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {totalStats.total > 0 ? Math.round((totalStats.sent / totalStats.total) * 100) : 0}% success rate
+              {successRate}% success rate • {completionRate}% completed
             </p>
           </CardContent>
         </Card>
@@ -353,7 +358,7 @@ const Broadcast = () => {
           <CardContent>
             <div className="text-2xl font-bold text-warning">{totalStats.pending.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              In queue
+              {totalStats.total > 0 ? Math.round((totalStats.pending / totalStats.total) * 100) : 0}% remaining
             </p>
           </CardContent>
         </Card>
@@ -366,7 +371,7 @@ const Broadcast = () => {
           <CardContent>
             <div className="text-2xl font-bold text-destructive">{totalStats.failed.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {totalStats.total > 0 ? Math.round((totalStats.failed / totalStats.total) * 100) : 0}% failure rate
+              {failureRate}% failure rate • {totalStats.failed > 0 ? 'Needs attention' : 'All good'}
             </p>
           </CardContent>
         </Card>
