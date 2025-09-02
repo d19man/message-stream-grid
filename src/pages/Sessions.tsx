@@ -30,7 +30,7 @@ const Sessions = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile } = useAuth();
-  const { sessions, loading, createSession, deleteSession, updateSession } = useSessions();
+  const { sessions, loading, createSession, deleteSession, updateSession, connectWhatsApp, disconnectWhatsApp, getQRCode } = useSessions();
 
   // Filter available pools based on user role
   const getAvailablePools = (): PoolType[] => {
@@ -105,18 +105,23 @@ const Sessions = () => {
     }
   };
 
-  const handleReconnect = async (sessionId: string) => {
-    const result = await updateSession(sessionId, { status: "connecting" });
-    if (result) {
+  const handleConnect = async (sessionId: string) => {
+    const success = await connectWhatsApp(sessionId);
+    if (success) {
       toast({
-        title: "Reconnecting",
-        description: "Attempting to reconnect session...",
+        title: "Connecting",
+        description: "Attempting to connect WhatsApp session...",
       });
-      
-      // Simulate reconnection process
-      setTimeout(async () => {
-        await updateSession(sessionId, { status: "disconnected" });
-      }, 2000);
+    }
+  };
+
+  const handleDisconnect = async (sessionId: string) => {
+    const success = await disconnectWhatsApp(sessionId);
+    if (success) {
+      toast({
+        title: "Disconnected",
+        description: "WhatsApp session disconnected successfully.",
+      });
     }
   };
 
@@ -128,20 +133,25 @@ const Sessions = () => {
     switch (status) {
       case "connected":
         return <Wifi className="h-4 w-4 text-success" />;
-      case "disconnected":
-        return <WifiOff className="h-4 w-4 text-destructive" />;
       case "connecting":
         return <RotateCcw className="h-4 w-4 text-warning animate-spin" />;
+      case "qr_required":
+        return <QrCode className="h-4 w-4 text-info" />;
+      case "pairing_required":
+        return <KeyRound className="h-4 w-4 text-info" />;
+      case "disconnected":
       default:
-        return <WifiOff className="h-4 w-4 text-muted-foreground" />;
+        return <WifiOff className="h-4 w-4 text-destructive" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       connected: { variant: "default" as const, className: "bg-success text-success-foreground" },
-      disconnected: { variant: "destructive" as const, className: "" },
       connecting: { variant: "secondary" as const, className: "bg-warning text-warning-foreground" },
+      qr_required: { variant: "secondary" as const, className: "bg-info text-info-foreground" },
+      pairing_required: { variant: "secondary" as const, className: "bg-info text-info-foreground" },
+      disconnected: { variant: "destructive" as const, className: "" },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.disconnected;
@@ -288,26 +298,72 @@ const Sessions = () => {
                         <p className="text-sm">{session.last_seen || "Never"}</p>
                       </div>
                       
-                      <div className="flex space-x-2 pt-2">
-                        {session.status === "disconnected" && (
+                      <div className="flex flex-col space-y-2 pt-2">
+                        {/* Connection Actions */}
+                        <div className="flex space-x-2">
+                          {session.status === "disconnected" && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1"
+                              onClick={() => handleConnect(session.id)}
+                            >
+                              <Wifi className="h-3 w-3 mr-1" />
+                              Connect
+                            </Button>
+                          )}
+                          {session.status === "connected" && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1"
+                              onClick={() => handleDisconnect(session.id)}
+                            >
+                              <WifiOff className="h-3 w-3 mr-1" />
+                              Disconnect
+                            </Button>
+                          )}
+                          {session.status === "connecting" && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              disabled
+                              className="flex-1"
+                            >
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Connecting...
+                            </Button>
+                          )}
+                          {session.status === "qr_required" && (
+                            <QRDialog sessionName={session.name} sessionId={session.id} trigger={
+                              <Button size="sm" variant="outline" className="flex-1">
+                                <QrCode className="h-3 w-3 mr-1" />
+                                Scan QR
+                              </Button>
+                            } />
+                          )}
+                          {session.status === "pairing_required" && (
+                            <PairingDialog sessionName={session.name} trigger={
+                              <Button size="sm" variant="outline" className="flex-1">
+                                <KeyRound className="h-3 w-3 mr-1" />
+                                Pairing Code
+                              </Button>
+                            } />
+                          )}
+                        </div>
+                        
+                        {/* Delete Action */}
+                        <div className="flex">
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="flex-1"
-                            onClick={() => handleReconnect(session.id)}
+                            className="text-destructive hover:text-destructive w-full"
+                            onClick={() => handleDeleteSession(session.id)}
                           >
-                            <RotateCcw className="h-3 w-3 mr-1" />
-                            Reconnect
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete Session
                           </Button>
-                        )}
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteSession(session.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

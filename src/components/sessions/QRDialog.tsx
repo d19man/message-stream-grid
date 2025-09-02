@@ -1,25 +1,69 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { QrCode, RefreshCw } from "lucide-react";
+import { QrCode, RefreshCw, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface QRDialogProps {
   sessionName: string;
+  sessionId?: string;
   trigger?: React.ReactNode;
 }
 
-export const QRDialog = ({ sessionName, trigger }: QRDialogProps) => {
-  const [refreshKey, setRefreshKey] = useState(0);
+export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => {
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
 
-  const refreshQR = () => {
-    setRefreshKey(prev => prev + 1);
+  const fetchQRCode = async () => {
+    if (!sessionId) return;
+    
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        body: {
+          action: 'getQR',
+          sessionId: sessionId
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.qrCode) {
+        setQrCode(data.qrCode);
+      } else {
+        toast({
+          title: "QR Code Not Available",
+          description: "Please try connecting the session first.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching QR code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch QR code",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Mock QR code - in real implementation, this would come from the backend
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=whatsapp-auth-${sessionName}-${refreshKey}`;
+  useEffect(() => {
+    if (open && sessionId) {
+      fetchQRCode();
+    }
+  }, [open, sessionId]);
+
+  const refreshQR = () => {
+    fetchQRCode();
+  };
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
           <Button size="sm" variant="outline">
@@ -43,12 +87,21 @@ export const QRDialog = ({ sessionName, trigger }: QRDialogProps) => {
           
           {/* QR Code */}
           <div className="flex justify-center p-4 bg-white rounded-lg">
-            <img 
-              src={qrCodeUrl} 
-              alt="WhatsApp QR Code" 
-              className="w-48 h-48"
-              key={refreshKey}
-            />
+            {loading ? (
+              <div className="w-48 h-48 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : qrCode ? (
+              <img 
+                src={`data:image/png;base64,${qrCode}`}
+                alt="WhatsApp QR Code" 
+                className="w-48 h-48"
+              />
+            ) : (
+              <div className="w-48 h-48 flex items-center justify-center text-muted-foreground">
+                No QR Code Available
+              </div>
+            )}
           </div>
 
           {/* Instructions */}
@@ -60,8 +113,17 @@ export const QRDialog = ({ sessionName, trigger }: QRDialogProps) => {
           </div>
 
           {/* Refresh Button */}
-          <Button variant="outline" onClick={refreshQR} className="w-full">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button 
+            variant="outline" 
+            onClick={refreshQR} 
+            className="w-full"
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
             Refresh QR Code
           </Button>
 
