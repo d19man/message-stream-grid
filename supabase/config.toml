@@ -8,3 +8,9 @@ verify_jwt = true
 
 [functions.change-user-password]
 verify_jwt = true
+
+[functions.whatsapp-session]
+verify_jwt = true
+
+[functions.whatsapp-send-message]
+verify_jwt = true

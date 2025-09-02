@@ -6,7 +6,7 @@ export interface Session {
   id: string;
   name: string;
   pool: "CRM" | "BLASTER" | "WARMUP";
-  status: "connected" | "connecting" | "disconnected";
+  status: "connected" | "connecting" | "disconnected" | "qr_required" | "pairing_required";
   phone?: string;
   last_seen?: string;
   user_id?: string;
@@ -42,7 +42,7 @@ export const useSessions = () => {
       setSessions(data.map(session => ({
         ...session,
         pool: session.pool as "CRM" | "BLASTER" | "WARMUP",
-        status: session.status as "connected" | "connecting" | "disconnected"
+        status: session.status as "connected" | "connecting" | "disconnected" | "qr_required" | "pairing_required"
       })));
     } catch (error) {
       console.error('Error:', error);
@@ -58,9 +58,26 @@ export const useSessions = () => {
 
   const createSession = async (sessionData: Partial<Session>) => {
     try {
+      const sessionId = crypto.randomUUID();
+      
+      // Create session in WhatsApp sessions table for Baileys
+      const { data: whatsappData, error: whatsappError } = await supabase.functions.invoke('whatsapp-session', {
+        body: {
+          action: 'create',
+          sessionName: sessionData.name || "New Session",
+          sessionId: sessionId
+        }
+      });
+
+      if (whatsappError) {
+        console.error('Error creating WhatsApp session:', whatsappError);
+      }
+
+      // Create session in main sessions table
       const { data, error } = await supabase
         .from('sessions')
         .insert({
+          id: sessionId,
           name: sessionData.name || "New Session",
           pool: sessionData.pool || "CRM",
           status: "disconnected",
@@ -84,11 +101,12 @@ export const useSessions = () => {
       setSessions(prev => [{ 
         ...data, 
         pool: data.pool as "CRM" | "BLASTER" | "WARMUP",
-        status: data.status as "connected" | "connecting" | "disconnected"
+        status: data.status as "connected" | "connecting" | "disconnected" | "qr_required" | "pairing_required"
       }, ...prev]);
+      
       toast({
         title: "Session Created",
-        description: `Session "${data.name}" has been created.`
+        description: `WhatsApp session "${data.name}" has been created.`
       });
 
       return data;
@@ -98,6 +116,138 @@ export const useSessions = () => {
         title: "Error",
         description: "Failed to create session",
         variant: "destructive"
+      });
+      return null;
+    }
+  };
+
+  // Connect WhatsApp session with Baileys
+  const connectWhatsApp = async (sessionId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        body: {
+          action: 'connect',
+          sessionId
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        // Update local session status
+        setSessions(prev => prev.map(s => s.id === sessionId ? { 
+          ...s, 
+          status: "connecting" as const
+        } : s));
+        
+        toast({
+          title: "Connecting",
+          description: "WhatsApp session is connecting...",
+        });
+        return true;
+      } else {
+        throw new Error(data.error || 'Failed to connect session');
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  // Disconnect WhatsApp session
+  const disconnectWhatsApp = async (sessionId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        body: {
+          action: 'disconnect',
+          sessionId
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        // Update local session status
+        setSessions(prev => prev.map(s => s.id === sessionId ? { 
+          ...s, 
+          status: "disconnected" as const,
+          phone: "",
+          last_seen: "Just now"
+        } : s));
+        
+        toast({
+          title: "Disconnected",
+          description: "WhatsApp session disconnected",
+        });
+        return true;
+      } else {
+        throw new Error(data.error || 'Failed to disconnect session');
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  // Get QR Code for session
+  const getQRCode = async (sessionId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+        body: {
+          action: 'getQR',
+          sessionId
+        }
+      });
+
+      if (error) throw error;
+      
+      return data;
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  // Send WhatsApp message
+  const sendMessage = async (sessionId: string, to: string, message: string, messageType: string = 'text') => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-send-message', {
+        body: {
+          sessionId,
+          to,
+          message,
+          messageType
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({
+          title: "Message Sent",
+          description: "WhatsApp message sent successfully",
+        });
+        return data;
+      } else {
+        throw new Error(data.error || 'Failed to send message');
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
       });
       return null;
     }
@@ -125,7 +275,7 @@ export const useSessions = () => {
       setSessions(prev => prev.map(s => s.id === sessionId ? { 
         ...data, 
         pool: data.pool as "CRM" | "BLASTER" | "WARMUP",
-        status: data.status as "connected" | "connecting" | "disconnected"
+        status: data.status as "connected" | "connecting" | "disconnected" | "qr_required" | "pairing_required"
       } : s));
       return data;
     } catch (error) {
@@ -141,6 +291,9 @@ export const useSessions = () => {
 
   const deleteSession = async (sessionId: string) => {
     try {
+      // First disconnect WhatsApp session
+      await disconnectWhatsApp(sessionId);
+      
       const { error } = await supabase
         .from('sessions')
         .delete()
@@ -159,7 +312,7 @@ export const useSessions = () => {
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       toast({
         title: "Session Deleted",
-        description: "Session has been deleted successfully."
+        description: "WhatsApp session has been deleted successfully."
       });
 
       return true;
@@ -183,6 +336,9 @@ export const useSessions = () => {
   };
 
   const clearDistribution = async (sessionId: string) => {
+    // Disconnect WhatsApp session when clearing distribution
+    await disconnectWhatsApp(sessionId);
+    
     return await updateSession(sessionId, { 
       user_id: null, 
       admin_id: null, 
@@ -192,8 +348,42 @@ export const useSessions = () => {
     });
   };
 
+  // Setup real-time subscriptions for WhatsApp sessions
   useEffect(() => {
     fetchSessions();
+
+    // Subscribe to WhatsApp session changes
+    const whatsappChannel = supabase
+      .channel('whatsapp-sessions-sync')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'whatsapp_sessions'
+        },
+        (payload) => {
+          console.log('WhatsApp session updated:', payload);
+          
+          // Update corresponding session status
+          setSessions(prev => prev.map(s => {
+            if (s.id === payload.new.id) {
+              return {
+                ...s,
+                status: payload.new.status,
+                phone: payload.new.phone_number || s.phone,
+                last_seen: new Date(payload.new.last_seen).toLocaleString()
+              };
+            }
+            return s;
+          }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(whatsappChannel);
+    };
   }, []);
 
   return {
@@ -205,6 +395,10 @@ export const useSessions = () => {
     shareToAdmin,
     assignToUser,
     clearDistribution,
+    connectWhatsApp,
+    disconnectWhatsApp,
+    getQRCode,
+    sendMessage,
     refetch: fetchSessions
   };
 };
