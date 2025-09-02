@@ -6,8 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Edit, FileText, Image, Mic, Square, Layers } from "lucide-react";
+import { Plus, Edit, FileText, Image, Mic, Square, Layers, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import type { Template, TemplateKind, PoolType } from "@/types";
 
 interface TemplateDialogProps {
@@ -18,6 +20,7 @@ interface TemplateDialogProps {
 
 export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProps) => {
   const [open, setOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: template?.name || "",
     kind: template?.kind || "text" as TemplateKind,
@@ -25,6 +28,103 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
     contentJson: template?.contentJson || {},
   });
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  const handleAudioUpload = async (file: File) => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to upload files",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/m4a'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Error",
+        description: "Please upload a valid audio file (MP3, WAV, OGG, M4A)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('template-audio')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('template-audio')
+        .getPublicUrl(fileName);
+
+      // Update form data with the uploaded file URL
+      setFormData(prev => ({
+        ...prev,
+        contentJson: { 
+          ...prev.contentJson, 
+          mediaUrl: publicUrl,
+          fileName: file.name,
+          fileSize: file.size
+        }
+      }));
+
+      toast({
+        title: "Success",
+        description: "Audio file uploaded successfully!",
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload audio file",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleAudioUpload(file);
+    }
+  };
+
+  const removeAudioFile = () => {
+    setFormData(prev => ({
+      ...prev,
+      contentJson: { 
+        ...prev.contentJson, 
+        mediaUrl: undefined,
+        fileName: undefined,
+        fileSize: undefined
+      }
+    }));
+  };
 
   const isEdit = !!template;
 
@@ -57,10 +157,10 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
       return;
     }
 
-    if (formData.kind === "button" && (!formData.contentJson.text?.trim() || !formData.contentJson.buttons?.length)) {
+    if (formData.kind === "audio" && !formData.contentJson.mediaUrl?.trim()) {
       toast({
         title: "Error",
-        description: "Button template requires text and at least one button",
+        description: "Please upload an audio file",
         variant: "destructive",
       });
       return;
@@ -276,16 +376,78 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
           {formData.kind === "audio" && (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="audio-url">Audio URL</Label>
-                <Input
-                  id="audio-url"
-                  value={formData.contentJson.mediaUrl || ""}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    contentJson: { ...prev.contentJson, mediaUrl: e.target.value }
-                  }))}
-                  placeholder="https://example.com/audio.mp3"
-                />
+                <Label>Audio File Upload</Label>
+                <div className="space-y-3">
+                  {!formData.contentJson.mediaUrl ? (
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
+                      <div className="text-center">
+                        <Mic className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Upload an audio file for your template
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-4">
+                          Supported formats: MP3, WAV, OGG, M4A (max 10MB)
+                        </p>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            onChange={handleFileInputChange}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            disabled={uploading}
+                          />
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            disabled={uploading}
+                            className="pointer-events-none"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploading ? "Uploading..." : "Choose Audio File"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                            <Mic className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">
+                              {formData.contentJson.fileName || "Audio file"}
+                            </p>
+                            {formData.contentJson.fileSize && (
+                              <p className="text-xs text-muted-foreground">
+                                {(formData.contentJson.fileSize / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <audio 
+                            controls 
+                            className="h-8"
+                            src={formData.contentJson.mediaUrl}
+                          >
+                            Your browser does not support the audio element.
+                          </audio>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={removeAudioFile}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <Label htmlFor="audio-caption">Caption</Label>
