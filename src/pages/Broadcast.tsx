@@ -148,7 +148,7 @@ const Broadcast = () => {
 
   // Filter jobs based on user role
   const getFilteredJobs = () => {
-    if (!profile?.role) return [];
+    if (!profile?.role || !jobs) return [];
     
     if (profile.role === 'superadmin' || profile.role === 'admin') {
       return jobs; // Admins see all campaigns

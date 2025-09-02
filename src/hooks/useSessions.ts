@@ -84,6 +84,7 @@ export const useSessions = () => {
           phone: "",
           last_seen: "Never",
           user_id: sessionData.user_id,
+          created_by: (await supabase.auth.getUser()).data.user?.id,
         })
         .select()
         .single();
