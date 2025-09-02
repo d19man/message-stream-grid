@@ -105,31 +105,53 @@ const Users = () => {
   }, [profile?.id]);
 
   const handleDeleteUser = async (id: string) => {
-    console.log('=== DELETE USER DEBUG START ===');
-    console.log('Target user ID:', id);
-    console.log('Current profile:', profile);
+    console.log('=== DELETE USER START ===', id, profile?.role);
     
     const { canManageUsers } = useAuth();
-    console.log('canManageUsers function result:', canManageUsers());
-    
-    console.log('Delete user attempt:', {
-      currentUserId: profile?.id,
-      currentUserRole: profile?.role,
-      targetUserId: id,
-      canManageUsers: canManageUsers()
-    });
-    
     if (!canManageUsers()) {
-      console.log('❌ BLOCKED: canManageUsers returned false');
-      toast({
-        title: "Access Denied",
-        description: "You don't have permission to delete users",
-        variant: "destructive",
-      });
+      toast({ title: "Access Denied", description: "No permission", variant: "destructive" });
       return;
     }
 
-    // Prevent deleting yourself or higher level users
+    const userToDelete = users.find(u => u.id === id);
+    if (!userToDelete) return;
+
+    if (userToDelete.id === profile?.id) {
+      toast({ title: "Error", description: "Cannot delete yourself", variant: "destructive" });
+      return;
+    }
+
+    if (profile?.role === 'admin' && ['superadmin', 'admin'].includes(userToDelete.role)) {
+      toast({ title: "Access Denied", description: "Cannot delete admin users", variant: "destructive" });
+      return;
+    }
+
+    if (profile?.role === 'admin' && userToDelete.admin_id !== profile?.id) {
+      toast({ title: "Access Denied", description: "Can only delete your own users", variant: "destructive" });
+      return;
+    }
+
+    if (confirm(`Delete ${userToDelete.email}?`)) {
+      setLoading(true);
+      try {
+        const { error } = await supabase.from('profiles').delete().eq('id', id);
+        if (error) throw error;
+        
+        if (profile?.role === 'superadmin') {
+          await supabase.auth.admin.deleteUser(id);
+        }
+        
+        setUsers(prev => prev.filter(u => u.id !== id));
+        toast({ title: "Success", description: "User deleted!" });
+      } catch (error: any) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleCreateUser = () => {
     const userToDelete = users.find(u => u.id === id);
     if (!userToDelete) {
       console.log('User to delete not found:', id);
