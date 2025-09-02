@@ -360,10 +360,10 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                       <span>Text</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="text_button">
+                  <SelectItem value="image">
                     <div className="flex items-center space-x-2">
-                      {getKindIcon("text_button")}
-                      <span>Text + Button</span>
+                      {getKindIcon("image")}
+                      <span>Image</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="text_image">
@@ -372,16 +372,28 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
                       <span>Text + Image</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="image_text_button">
-                    <div className="flex items-center space-x-2">
-                      {getKindIcon("image_text_button")}
-                      <span>Full Template</span>
-                    </div>
-                  </SelectItem>
                   <SelectItem value="audio">
                     <div className="flex items-center space-x-2">
                       {getKindIcon("audio")}
                       <span>Audio</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="button">
+                    <div className="flex items-center space-x-2">
+                      {getKindIcon("button")}
+                      <span>Button</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="text_button">
+                    <div className="flex items-center space-x-2">
+                      {getKindIcon("text_button")}
+                      <span>Text + Button</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="image_text_button">
+                    <div className="flex items-center space-x-2">
+                      {getKindIcon("image_text_button")}
+                      <span>Full</span>
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -424,7 +436,7 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
           )}
 
           {/* Image Path */}
-          {(formData.kind === "text_image" || formData.kind === "image_text_button") && (
+          {(formData.kind === "image" || formData.kind === "text_image" || formData.kind === "image_text_button") && (
             <div>
               <Label htmlFor="image-path">Image Path</Label>
               <Input
@@ -440,7 +452,7 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
           )}
 
           {/* Interactive Buttons */}
-          {(formData.kind === "text_button" || formData.kind === "image_text_button") && (
+          {(formData.kind === "button" || formData.kind === "text_button" || formData.kind === "image_text_button") && (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <Label>Interactive Buttons</Label>
