@@ -35,6 +35,8 @@ import {
 } from "lucide-react";
 import type { Session, PoolType, User, Role } from "@/types";
 import { SessionDialog } from "@/components/sessions/SessionDialog";
+import { ShareSessionDialog } from "@/components/sessions/ShareSessionDialog";
+import { ShareToUserDialog } from "@/components/sessions/ShareToUserDialog";
 
 // Mock current user - in real app, this would come from auth context
 const currentUser: User & { role: Role } = {
@@ -205,9 +207,9 @@ const PoolSessions = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Pool Sessions</h1>
+          <h1 className="text-3xl font-bold tracking-tight">WhatsApp</h1>
           <p className="text-muted-foreground">
-            Manage WhatsApp sessions across different pools and users
+            Manage and share WhatsApp sessions across teams
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -294,10 +296,37 @@ const PoolSessions = () => {
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Reconnect
                           </DropdownMenuItem>
-                          {canTransferSession && (
-                            <DropdownMenuItem onClick={() => handleTransferSession(session.id)}>
-                              <ArrowRightLeft className="h-4 w-4 mr-2" />
-                              Transfer
+                          {currentUser.role.name === "Super Admin" && (
+                            <DropdownMenuItem asChild>
+                              <div>
+                                <ShareSessionDialog 
+                                  sessionName={session.name}
+                                  onShare={(adminId) => console.log('Shared to admin:', adminId)}
+                                  trigger={
+                                    <div className="flex items-center w-full cursor-pointer">
+                                      <Crown className="h-4 w-4 mr-2" />
+                                      Share to Admin
+                                    </div>
+                                  }
+                                />
+                              </div>
+                            </DropdownMenuItem>
+                          )}
+                          {currentUser.role.name === "Admin" && (
+                            <DropdownMenuItem asChild>
+                              <div>
+                                <ShareToUserDialog 
+                                  sessionName={session.name}
+                                  sessionPool={session.pool}
+                                  onShare={(userId) => console.log('Assigned to user:', userId)}
+                                  trigger={
+                                    <div className="flex items-center w-full cursor-pointer">
+                                      <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                      Assign to User
+                                    </div>
+                                  }
+                                />
+                              </div>
                             </DropdownMenuItem>
                           )}
                           {canDeleteSession && (
