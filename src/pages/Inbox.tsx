@@ -12,12 +12,19 @@ import {
   Image,
   Paperclip,
   MoreVertical,
+  Loader2,
 } from "lucide-react";
 import type { PoolType, InboxMessage } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Inbox = () => {
   const { profile } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Filter available pools based on user role
   const getAvailablePools = (): PoolType[] => {
@@ -59,41 +66,124 @@ const Inbox = () => {
   const [selectedPool, setSelectedPool] = useState<PoolType>("CRM");
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
 
+  // Fetch messages from database
+  const fetchMessages = async () => {
+    if (!profile) return;
+    
+    try {
+      setLoading(true);
+      
+      // Get user's accessible sessions first
+      let sessionsQuery = supabase.from('whatsapp_sessions').select('*');
+      
+      if (profile.role === 'superadmin') {
+        // Superadmin can see all sessions
+      } else if (profile.role === 'admin') {
+        sessionsQuery = sessionsQuery.eq('admin_id', profile.id);
+      } else {
+        sessionsQuery = sessionsQuery.eq('user_id', profile.id);
+      }
+      
+      const { data: sessions, error: sessionsError } = await sessionsQuery;
+      if (sessionsError) throw sessionsError;
+      
+      if (!sessions || sessions.length === 0) {
+        setMessages([]);
+        return;
+      }
+      
+      const sessionIds = sessions.map(s => s.id);
+      
+      // Fetch messages from accessible sessions
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('whatsapp_messages')
+        .select('*')
+        .in('session_id', sessionIds)
+        .order('timestamp', { ascending: false })
+        .limit(1000);
+        
+      if (messagesError) throw messagesError;
+      
+      setMessages(messagesData || []);
+    } catch (error: any) {
+      console.error('Error fetching messages:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load messages",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Update selected pool when profile loads
   useEffect(() => {
     if (profile?.role) {
       const defaultPool = getDefaultPool();
       setSelectedPool(defaultPool);
+      fetchMessages();
     }
   }, [profile?.role]);
 
-  // Mock data - removed, will use real data from backend
-  const messages: InboxMessage[] = [];
+  // Set up real-time subscription for new messages
+  useEffect(() => {
+    if (!profile) return;
 
+    const channel = supabase
+      .channel('inbox-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'whatsapp_messages'
+        },
+        () => {
+          fetchMessages(); // Refresh messages when there are changes
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
+
+  // Group messages into threads by phone number
   const threads = messages.reduce((acc, msg) => {
-    if (!acc[msg.threadId]) {
-      acc[msg.threadId] = {
-        id: msg.threadId,
-        contactPhone: msg.contactPhone,
-        contactName: msg.contactName,
+    const threadId = msg.is_from_me ? msg.to_number : msg.from_number;
+    
+    if (!acc[threadId]) {
+      acc[threadId] = {
+        id: threadId,
+        contactPhone: threadId,
+        contactName: threadId, // Could be enhanced with contact names
         lastMessage: msg,
         unreadCount: 0,
-        pool: msg.pool,
+        pool: "CRM", // Map to appropriate pool based on session
       };
     }
     
-    if (new Date(msg.createdAt) > new Date(acc[msg.threadId].lastMessage.createdAt)) {
-      acc[msg.threadId].lastMessage = msg;
+    if (new Date(msg.timestamp) > new Date(acc[threadId].lastMessage.timestamp)) {
+      acc[threadId].lastMessage = msg;
     }
     
-    if (!msg.isRead && msg.direction === "incoming") {
-      acc[msg.threadId].unreadCount++;
+    // Count unread messages (incoming messages)
+    if (!msg.is_from_me) {
+      acc[threadId].unreadCount++;
     }
     
     return acc;
   }, {} as Record<string, any>);
 
-  const filteredThreads = Object.values(threads).filter((thread: any) => thread.pool === selectedPool);
+  const filteredThreads = Object.values(threads).filter((thread: any) => {
+    if (searchQuery) {
+      return thread.contactPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             thread.contactName.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    return true;
+  });
 
   return (
     <div className="h-[calc(100vh-200px)] animate-fade-in">
@@ -124,16 +214,30 @@ const Inbox = () => {
               <Input
                 placeholder="Search conversations..."
                 className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
 
           {/* Thread List */}
           <div className="overflow-y-auto">
-            {filteredThreads.length === 0 ? (
+            {loading ? (
+              <div className="p-4 text-center">
+                <Loader2 className="h-6 w-6 text-muted-foreground mx-auto mb-2 animate-spin" />
+                <p className="text-sm text-muted-foreground">Loading conversations...</p>
+              </div>
+            ) : filteredThreads.length === 0 ? (
               <div className="p-4 text-center">
                 <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No conversations yet</p>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? "No conversations found" : "No conversations yet"}
+                </p>
+                {!searchQuery && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Messages will appear here when you receive WhatsApp messages
+                  </p>
+                )}
               </div>
             ) : (
               filteredThreads.map((thread: any) => (
@@ -163,10 +267,10 @@ const Inbox = () => {
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground truncate">
-                    {thread.lastMessage.content.text || "Media message"}
+                    {thread.lastMessage.message_text || "Media message"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(thread.lastMessage.createdAt).toLocaleTimeString()}
+                    {new Date(thread.lastMessage.timestamp).toLocaleTimeString()}
                   </p>
                 </div>
               ))
@@ -206,22 +310,26 @@ const Inbox = () => {
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages
-                  .filter(msg => msg.threadId === selectedThread)
+                  .filter(msg => {
+                    const threadId = msg.is_from_me ? msg.to_number : msg.from_number;
+                    return threadId === selectedThread;
+                  })
+                  .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
                   .map((message) => (
                     <div
                       key={message.id}
-                      className={`flex ${message.direction === "outgoing" ? "justify-end" : "justify-start"}`}
+                      className={`flex ${message.is_from_me ? "justify-end" : "justify-start"}`}
                     >
                       <div
                         className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          message.direction === "outgoing"
+                          message.is_from_me
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted text-muted-foreground"
                         }`}
                       >
-                        <p className="text-sm">{message.content.text}</p>
+                        <p className="text-sm">{message.message_text || "Media message"}</p>
                         <p className="text-xs opacity-70 mt-1">
-                          {new Date(message.createdAt).toLocaleTimeString()}
+                          {new Date(message.timestamp).toLocaleTimeString()}
                         </p>
                       </div>
                     </div>
