@@ -137,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('subscription_type, subscription_end, subscription_active, role')
+          .select('subscription_type, subscription_end, subscription_active, role, admin_id')
           .eq('id', data.user.id)
           .single();
 
@@ -151,18 +151,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { error: null };
         }
 
-        // Check subscription status for all users except superadmin
+        // For admin role, check their own subscription
+        // For CRM/Blaster/Warmup roles, check their admin's subscription
+        let subscriptionData = {
+          subscription_type: profileData.subscription_type,
+          subscription_end: profileData.subscription_end,
+          subscription_active: profileData.subscription_active
+        };
+        
+        if (['crm', 'blaster', 'warmup'].includes(profileData.role) && profileData.admin_id) {
+          // Get admin's subscription info
+          const { data: adminProfile, error: adminError } = await supabase
+            .from('profiles')
+            .select('subscription_type, subscription_end, subscription_active')
+            .eq('id', profileData.admin_id)
+            .single();
+          
+          if (adminError) {
+            console.error('Error fetching admin profile:', adminError);
+            await supabase.auth.signOut();
+            return { 
+              error: { 
+                message: 'Unable to verify subscription status. Please try again.' 
+              } 
+            };
+          }
+          
+          subscriptionData = adminProfile;
+        }
+
+        // Check subscription status
         const now = new Date();
-        const isLifetime = profileData.subscription_type === 'lifetime';
-        const isExpired = profileData.subscription_end ? now > new Date(profileData.subscription_end) : true;
-        const hasActiveSubscription = profileData.subscription_active && (isLifetime || !isExpired);
+        const isLifetime = subscriptionData.subscription_type === 'lifetime';
+        const isExpired = subscriptionData.subscription_end ? now > new Date(subscriptionData.subscription_end) : true;
+        const hasActiveSubscription = subscriptionData.subscription_active && (isLifetime || !isExpired);
 
         if (!hasActiveSubscription) {
           // Sign out the user immediately
           await supabase.auth.signOut();
+          const roleMessage = ['crm', 'blaster', 'warmup'].includes(profileData.role) 
+            ? 'Your admin\'s subscription has expired. Please contact your administrator.' 
+            : 'Your subscription has expired. Please contact your administrator to renew your subscription.';
           return { 
             error: { 
-              message: 'Your subscription has expired. Please contact your administrator to renew your subscription.' 
+              message: roleMessage
             } 
           };
         }
@@ -216,7 +248,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const canManageSubscriptions = () => {
-    return profile?.role === 'superadmin' || profile?.role === 'admin';
+    return profile?.role === 'superadmin';
   };
 
   const canAccessDashboard = () => {
