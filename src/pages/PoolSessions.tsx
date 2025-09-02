@@ -42,10 +42,12 @@ import type { PoolType } from "@/types";
 import { SessionDialog } from "@/components/sessions/SessionDialog";
 import { ShareSessionDialog } from "@/components/sessions/ShareSessionDialog";
 import { ShareToUserDialog } from "@/components/sessions/ShareToUserDialog";
+import { QRDialog } from "@/components/sessions/QRDialog";
+import { PairingDialog } from "@/components/sessions/PairingDialog";
 
 const PoolSessions = () => {
   const { user, profile } = useAuth();
-  const { sessions, loading: sessionsLoading, createSession, deleteSession, shareToAdmin, assignToUser, clearDistribution } = useSessions();
+  const { sessions, loading: sessionsLoading, createSession, deleteSession, shareToAdmin, assignToUser, clearDistribution, connectWhatsApp, disconnectWhatsApp } = useSessions();
   const { users, loading: usersLoading, getAdmins, getUsersByPool, getUserName } = useUsers();
   const { toast } = useToast();
   
@@ -56,6 +58,34 @@ const PoolSessions = () => {
     sessionId: null,
     isHardDelete: false
   });
+  const [qrDialogSession, setQrDialogSession] = useState<Session | null>(null);
+  const [pairingDialogSession, setPairingDialogSession] = useState<Session | null>(null);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [pairingDialogOpen, setPairingDialogOpen] = useState(false);
+
+  // Auto-open dialogs when session is selected
+  useEffect(() => {
+    if (qrDialogSession) {
+      setQrDialogOpen(true);
+    }
+  }, [qrDialogSession]);
+
+  useEffect(() => {
+    if (pairingDialogSession) {
+      setPairingDialogOpen(true);
+    }
+  }, [pairingDialogSession]);
+
+  // Close handlers
+  const handleQrDialogClose = () => {
+    setQrDialogOpen(false);
+    setQrDialogSession(null);
+  };
+
+  const handlePairingDialogClose = () => {
+    setPairingDialogOpen(false);
+    setPairingDialogSession(null);
+  };
 
   // Get available pools based on user role
   const getAvailablePools = (): PoolType[] => {
@@ -154,6 +184,26 @@ const PoolSessions = () => {
     }
 
     setSelectedSessionForSharing(null);
+  };
+
+  const handleConnect = async (sessionId: string) => {
+    const success = await connectWhatsApp(sessionId);
+    if (success) {
+      toast({
+        title: "Connecting",
+        description: "Attempting to connect WhatsApp session...",
+      });
+    }
+  };
+
+  const handleDisconnect = async (sessionId: string) => {
+    const success = await disconnectWhatsApp(sessionId);
+    if (success) {
+      toast({
+        title: "Disconnected",
+        description: "WhatsApp session disconnected successfully.",
+      });
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -294,18 +344,30 @@ const PoolSessions = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <QrCode className="h-4 w-4 mr-2" />
-                            QR Code
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Key className="h-4 w-4 mr-2" />
-                            Pairing Code
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Reconnect
-                          </DropdownMenuItem>
+                          {session.status === "qr_required" && (
+                            <DropdownMenuItem onClick={() => setQrDialogSession(session)}>
+                              <QrCode className="h-4 w-4 mr-2" />
+                              QR Code
+                            </DropdownMenuItem>
+                          )}
+                          {(session.status === "disconnected" || session.status === "pairing_required") && (
+                            <DropdownMenuItem onClick={() => setPairingDialogSession(session)}>
+                              <Key className="h-4 w-4 mr-2" />
+                              Pairing Code
+                            </DropdownMenuItem>
+                          )}
+                          {session.status === "disconnected" && (
+                            <DropdownMenuItem onClick={() => handleConnect(session.id)}>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Connect
+                            </DropdownMenuItem>
+                          )}
+                          {session.status === "connected" && (
+                            <DropdownMenuItem onClick={() => handleDisconnect(session.id)}>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Disconnect
+                            </DropdownMenuItem>
+                          )}
                           {profile?.role === "superadmin" && (
                             <>
                               <DropdownMenuItem 
@@ -464,6 +526,24 @@ const PoolSessions = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* QR Dialog */}
+      {qrDialogSession && (
+        <QRDialog 
+          sessionName={qrDialogSession.name}
+          sessionId={qrDialogSession.id}
+          trigger={<div />}
+        />
+      )}
+
+      {/* Pairing Dialog */}
+      {pairingDialogSession && (
+        <PairingDialog 
+          sessionName={pairingDialogSession.name}
+          sessionId={pairingDialogSession.id}
+          trigger={<div />}
+        />
+      )}
     </div>
   );
 };
