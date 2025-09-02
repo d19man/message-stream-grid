@@ -187,7 +187,7 @@ export const UserDialog = ({ user, roles, trigger, onSave }: UserDialogProps) =>
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                {roles.map((role) => (
+                {(roles || []).map((role) => (
                   <SelectItem key={role.id} value={role.id}>
                     <div>
                       <div className="font-medium">{role.name}</div>
