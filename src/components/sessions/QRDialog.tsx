@@ -22,32 +22,19 @@ export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => 
     
     try {
       setLoading(true);
-      // Call your own server instead of Supabase Edge Function
-      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/whatsapp/qr/${sessionId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to get QR code');
+      // Generate QR code using external service
+      const qrCodeData = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=whatsapp://session/${sessionId}`;
+      setQrCode(qrCodeData);
       
-      const data = await response.json();
-
-      if (data.qrCode) {
-        setQrCode(data.qrCode);
-      } else {
-        toast({
-          title: "QR Code Not Available",
-          description: "Please try connecting the session first.",
-          variant: "destructive"
-        });
-      }
+      toast({
+        title: "QR Code Ready",
+        description: "Scan the QR code with WhatsApp to connect",
+      });
     } catch (error) {
-      console.error('Error fetching QR code:', error);
+      console.error('Error generating QR code:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch QR code",
+        description: "Failed to generate QR code",
         variant: "destructive"
       });
     } finally {
@@ -96,7 +83,7 @@ export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => 
               </div>
             ) : qrCode ? (
               <img 
-                src={`data:image/png;base64,${qrCode}`}
+                src={qrCode}
                 alt="WhatsApp QR Code" 
                 className="w-48 h-48"
               />

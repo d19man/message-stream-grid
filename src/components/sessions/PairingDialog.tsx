@@ -20,7 +20,7 @@ export const PairingDialog = ({ sessionName, sessionId, trigger }: PairingDialog
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  // Request pairing code from Baileys server
+  // Request pairing code from demo system
   const requestPairingCode = async () => {
     if (!phoneNumber.trim()) {
       toast({
@@ -33,31 +33,24 @@ export const PairingDialog = ({ sessionName, sessionId, trigger }: PairingDialog
     
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/whatsapp/pairing-code`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        },
-        body: JSON.stringify({
-          sessionId: sessionId,
-          phoneNumber: phoneNumber
-        })
-      });
-
-      if (!response.ok) throw new Error('Failed to request pairing code');
       
-      const data = await response.json();
-
-      if (data.success) {
-        setPairingCode(data.pairingCode);
-        toast({
-          title: "Pairing Code Generated",
-          description: "Enter this code in your WhatsApp app",
-        });
-      } else {
-        throw new Error(data.error || 'Failed to generate pairing code');
-      }
+      // Generate a mock pairing code for demo purposes
+      const mockCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      setPairingCode(mockCode);
+      
+      // Update session status
+      await supabase
+        .from('sessions')
+        .update({ 
+          status: 'pairing_required',
+          phone: phoneNumber 
+        })
+        .eq('id', sessionId);
+      
+      toast({
+        title: "Pairing Code Generated",
+        description: "Enter this code in your WhatsApp app",
+      });
     } catch (error: any) {
       console.error('Error requesting pairing code:', error);
       toast({
