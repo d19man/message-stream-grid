@@ -344,8 +344,17 @@ const PoolSessions = () => {
                           {getStatusBadge(session.status)}
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Assigned to</span>
-                          <span className="text-sm font-medium">{getUserName(session.user_id || "")}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {session.user_id ? "Assigned to" : session.admin_id ? "With Admin" : "Available"}
+                          </span>
+                          <span className="text-sm font-medium">
+                            {session.user_id 
+                              ? getUserName(session.user_id)
+                              : session.admin_id 
+                                ? getUserName(session.admin_id)
+                                : "Not assigned"
+                            }
+                          </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Phone</span>

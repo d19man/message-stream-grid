@@ -62,7 +62,10 @@ export const useUsers = () => {
   };
 
   const getUserName = (userId: string) => {
+    if (!userId) return "Not assigned";
+    
     const user = users.find(u => u.id === userId);
+    
     return user?.full_name || user?.email || "Unknown User";
   };
 
