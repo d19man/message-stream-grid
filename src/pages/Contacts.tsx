@@ -74,15 +74,6 @@ const Contacts = () => {
 
   const [selectedPool, setSelectedPool] = useState<PoolType>("CRM");
 
-  // Update selected pool when profile loads
-  useEffect(() => {
-    if (profile?.role) {
-      const defaultPool = getDefaultPool();
-      setSelectedPool(defaultPool);
-      fetchContacts();
-    }
-  }, [profile?.role]);
-
   // Fetch contacts from database
   const fetchContacts = async () => {
     if (!user) return;
@@ -140,6 +131,15 @@ const Contacts = () => {
       setLoading(false);
     }
   };
+
+  // Update selected pool when profile loads
+  useEffect(() => {
+    if (profile?.role && user) {
+      const defaultPool = getDefaultPool();
+      setSelectedPool(defaultPool);
+      fetchContacts();
+    }
+  }, [profile?.role, user?.id]);
 
   const handleSaveContact = async (contactData: Partial<Contact>) => {
     if (!user) return;
@@ -373,7 +373,7 @@ const Contacts = () => {
           <CardContent>
             <div className="text-2xl font-bold text-destructive">{stats.optedOut}</div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((stats.optedOut / stats.total) * 100)}% of total
+              {stats.total > 0 ? Math.round((stats.optedOut / stats.total) * 100) : 0}% of total
             </p>
           </CardContent>
         </Card>
@@ -546,8 +546,8 @@ const Contacts = () => {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          className="text-destructive hover:text-destructive"
                           onClick={() => handleDeleteContact(contact.id)}
+                          className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
