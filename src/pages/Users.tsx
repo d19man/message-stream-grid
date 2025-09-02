@@ -479,14 +479,17 @@ const Users = () => {
                              userEmail={user.email}
                            />
                          )}
-                         <Button 
-                           variant="ghost" 
-                           size="sm" 
-                           className="text-destructive hover:text-destructive"
-                           onClick={() => handleDeleteUser(user.id)}
-                         >
-                           <Trash2 className="h-3 w-3" />
-                         </Button>
+                          {/* Hide delete button for admin viewing their own profile */}
+                          {!(user.id === profile?.id && profile?.role === 'admin') && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteUser(user.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
                        </div>
                      </TableCell>
                    )}
