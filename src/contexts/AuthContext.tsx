@@ -146,12 +146,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { error: profileError };
         }
 
-        // Check if user has superadmin or admin role (bypass subscription check)
-        if (['superadmin', 'admin'].includes(profileData.role)) {
+        // Check if user has superadmin role (only superadmin bypasses subscription check)
+        if (profileData.role === 'superadmin') {
           return { error: null };
         }
 
-        // Check subscription status for regular users (CRM, Blaster, Warmup, User)
+        // Check subscription status for all users except superadmin
         const now = new Date();
         const isLifetime = profileData.subscription_type === 'lifetime';
         const isExpired = profileData.subscription_end ? now > new Date(profileData.subscription_end) : true;

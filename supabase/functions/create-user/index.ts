@@ -124,6 +124,24 @@ serve(async (req) => {
     // Set admin_id if current user is admin (for their sub-users)
     if (currentProfile.role === 'admin' && ['crm', 'blaster', 'warmup'].includes(role)) {
       updateData.admin_id = currentProfile.id;
+      
+      // Inherit admin's subscription
+      const { data: adminProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('subscription_type, subscription_start, subscription_end, subscription_active')
+        .eq('id', currentProfile.id)
+        .single()
+
+      if (adminProfile && adminProfile.subscription_active) {
+        updateData.subscription_type = adminProfile.subscription_type;
+        updateData.subscription_start = adminProfile.subscription_start;
+        updateData.subscription_end = adminProfile.subscription_end;
+        updateData.subscription_active = adminProfile.subscription_active;
+        logStep("Inheriting admin subscription", { 
+          subscriptionType: adminProfile.subscription_type,
+          subscriptionActive: adminProfile.subscription_active
+        });
+      }
     }
 
     logStep("Updating profile", updateData);
@@ -149,10 +167,10 @@ serve(async (req) => {
       full_name: fullName,
       role: role,
       admin_id: updateData.admin_id || null,
-      subscription_type: null,
-      subscription_start: null,
-      subscription_end: null,
-      subscription_active: false,
+      subscription_type: updateData.subscription_type || null,
+      subscription_start: updateData.subscription_start || null,
+      subscription_end: updateData.subscription_end || null,
+      subscription_active: updateData.subscription_active || false,
       created_at: authData.user.created_at,
       updated_at: new Date().toISOString()
     };

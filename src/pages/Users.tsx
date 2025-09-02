@@ -24,6 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import SubscriptionDialog from '@/components/subscriptions/SubscriptionDialog';
 import UserCreateDialog from '@/components/users/UserCreateDialog';
+import ChangePasswordDialog from '@/components/users/ChangePasswordDialog';
 
 interface User {
   id: string;
@@ -157,12 +158,45 @@ const Users = () => {
     }
   };
 
+  // Create hierarchical view for superadmin
+  const getHierarchicalUsers = () => {
+    if (profile?.role !== 'superadmin') {
+      return filteredUsers;
+    }
+
+    const adminUsers = filteredUsers.filter(u => u.role === 'admin');
+    const hierarchicalView = [];
+
+    // Add superadmin first
+    const superadmins = filteredUsers.filter(u => u.role === 'superadmin');
+    hierarchicalView.push(...superadmins);
+
+    // Add each admin and their sub-users
+    adminUsers.forEach(admin => {
+      hierarchicalView.push(admin);
+      const subUsers = filteredUsers.filter(u => u.admin_id === admin.id);
+      hierarchicalView.push(...subUsers);
+    });
+
+    // Add standalone users (no admin_id and not admin/superadmin)
+    const standaloneUsers = filteredUsers.filter(u => 
+      !u.admin_id && 
+      !['admin', 'superadmin'].includes(u.role) && 
+      !adminUsers.some(admin => admin.id === u.id)
+    );
+    hierarchicalView.push(...standaloneUsers);
+
+    return hierarchicalView;
+  };
+
   // Filter users
   const filteredUsers = users.filter(user => 
     (user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const displayUsers = getHierarchicalUsers();
 
   const stats = {
     total: users.length,
@@ -327,11 +361,16 @@ const Users = () => {
       <Card className="shadow-card">
         <CardHeader>
           <CardTitle>
-            Users ({filteredUsers.length})
+            Users ({displayUsers.length})
+            {profile?.role === 'superadmin' && (
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                Hierarchical View
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredUsers.length === 0 ? (
+          {displayUsers.length === 0 ? (
             <div className="text-center py-8">
               <Users2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No users found</h3>
@@ -355,20 +394,30 @@ const Users = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
-                          <span className="text-xs font-semibold text-primary-foreground">
-                            {(user.full_name || user.email).charAt(0).toUpperCase()}
-                          </span>
+                {displayUsers.map((user) => {
+                  const isSubUser = user.admin_id && profile?.role === 'superadmin';
+                  const isAdmin = user.role === 'admin';
+                  const adminUserCount = users.filter(u => u.admin_id === user.id).length;
+                  
+                  return (
+                    <TableRow key={user.id} className={isSubUser ? 'bg-muted/30' : ''}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center ${isSubUser ? 'ml-6' : ''}`}>
+                            <span className="text-xs font-semibold text-primary-foreground">
+                              {(user.full_name || user.email).charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium">{user.full_name || 'No name'}</p>
+                            {isAdmin && adminUserCount > 0 && profile?.role === 'superadmin' && (
+                              <p className="text-xs text-muted-foreground">
+                                {adminUserCount} users under this admin
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{user.full_name || 'No name'}</p>
-                        </div>
-                      </div>
-                    </TableCell>
+                      </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Mail className="h-4 w-4 text-muted-foreground" />
@@ -401,31 +450,38 @@ const Users = () => {
                         {new Date(user.updated_at).toLocaleDateString()}
                       </span>
                     </TableCell>
-                  {canManageUsers() && (
-                    <TableCell>
-                      <div className="flex items-center space-x-1">
-                        <SubscriptionDialog 
-                          user={user}
-                          onSuccess={fetchUsers}
-                          trigger={
-                            <Button variant="ghost" size="sm">
-                              <Calendar className="h-3 w-3" />
-                            </Button>
-                          }
-                        />
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                  </TableRow>
-                ))}
+                   {canManageUsers() && (
+                     <TableCell>
+                       <div className="flex items-center space-x-1">
+                         <SubscriptionDialog 
+                           user={user}
+                           onSuccess={fetchUsers}
+                           trigger={
+                             <Button variant="ghost" size="sm">
+                               <Calendar className="h-3 w-3" />
+                             </Button>
+                           }
+                         />
+                         {profile?.role === 'superadmin' && (user.role === 'admin' || user.role === 'user') && (
+                           <ChangePasswordDialog 
+                             userId={user.id}
+                             userEmail={user.email}
+                           />
+                         )}
+                         <Button 
+                           variant="ghost" 
+                           size="sm" 
+                           className="text-destructive hover:text-destructive"
+                           onClick={() => handleDeleteUser(user.id)}
+                         >
+                           <Trash2 className="h-3 w-3" />
+                         </Button>
+                       </div>
+                     </TableCell>
+                   )}
+                   </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
