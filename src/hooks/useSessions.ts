@@ -60,11 +60,14 @@ export const useSessions = () => {
     try {
       const sessionId = crypto.randomUUID();
       
+      // Create unique session name with timestamp to avoid duplicates
+      const uniqueSessionName = `${sessionData.name || "Session"}_${Date.now()}`;
+      
       // Create session in WhatsApp sessions table for Baileys
       const { data: whatsappData, error: whatsappError } = await supabase.functions.invoke('whatsapp-session', {
         body: {
           action: 'create',
-          sessionName: sessionData.name || "New Session",
+          sessionName: uniqueSessionName,
           sessionId: sessionId
         }
       });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,6 +90,9 @@ export const SessionDialog = ({ trigger, onSave }: SessionDialogProps) => {
             <Plus className="h-5 w-5" />
             <span>Add New Session</span>
           </DialogTitle>
+          <DialogDescription>
+            Create a new WhatsApp session for sending messages through your selected pool.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
