@@ -63,20 +63,28 @@ export const useSessions = () => {
       // Create unique session name with timestamp to avoid duplicates
       const uniqueSessionName = `${sessionData.name || "Session"}_${Date.now()}`;
       
-      // Create session in WhatsApp sessions table for Baileys
-      const { data: whatsappData, error: whatsappError } = await supabase.functions.invoke('whatsapp-session', {
-        body: {
-          action: 'create',
-          sessionName: uniqueSessionName,
-          sessionId: sessionId
-        }
-      });
+      // Call your own server instead of Supabase Edge Function
+      try {
+        const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/whatsapp/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: JSON.stringify({
+            sessionName: uniqueSessionName,
+            sessionId: sessionId
+          })
+        });
 
-      if (whatsappError) {
-        console.error('Error creating WhatsApp session:', whatsappError);
+        if (!response.ok) {
+          console.error('Error creating WhatsApp session on server:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error calling WhatsApp server:', error);
       }
 
-      // Create session in main sessions table
+      // Create session in main sessions table (keep using Supabase for database)
       const { data, error } = await supabase
         .from('sessions')
         .insert({
@@ -132,14 +140,21 @@ export const useSessions = () => {
   // Connect WhatsApp session with Baileys
   const connectWhatsApp = async (sessionId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
-        body: {
-          action: 'connect',
-          sessionId
-        }
+      // Call your own server instead of Supabase Edge Function
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/whatsapp/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          sessionId: sessionId
+        })
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to connect session');
+      
+      const data = await response.json();
 
       if (data.success) {
         // Update local session status
@@ -169,14 +184,21 @@ export const useSessions = () => {
   // Disconnect WhatsApp session
   const disconnectWhatsApp = async (sessionId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
-        body: {
-          action: 'disconnect',
-          sessionId
-        }
+      // Call your own server instead of Supabase Edge Function
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/whatsapp/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          sessionId: sessionId
+        })
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to disconnect session');
+      
+      const data = await response.json();
 
       if (data.success) {
         // Update local session status
@@ -208,15 +230,17 @@ export const useSessions = () => {
   // Get QR Code for session
   const getQRCode = async (sessionId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
-        body: {
-          action: 'getQR',
-          sessionId
+      // Call your own server instead of Supabase Edge Function
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/whatsapp/qr/${sessionId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
         }
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to get QR code');
       
+      const data = await response.json();
       return data;
     } catch (err: any) {
       toast({
@@ -231,16 +255,24 @@ export const useSessions = () => {
   // Send WhatsApp message
   const sendMessage = async (sessionId: string, to: string, message: string, messageType: string = 'text') => {
     try {
-      const { data, error } = await supabase.functions.invoke('whatsapp-send-message', {
-        body: {
+      // Call your own server instead of Supabase Edge Function
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/whatsapp/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
           sessionId,
           to,
           message,
           messageType
-        }
+        })
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to send message');
+      
+      const data = await response.json();
 
       if (data.success) {
         toast({
