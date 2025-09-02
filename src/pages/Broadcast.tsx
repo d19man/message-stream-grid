@@ -38,42 +38,7 @@ const Broadcast = () => {
   const { toast } = useToast();
   const { profile } = useAuth();
   
-  // Filter available pools based on user role
-  const getAvailablePools = (): PoolType[] => {
-    if (!profile?.role) return ["CRM"];
-    
-    switch (profile.role) {
-      case 'crm':
-        return ["CRM"];
-      case 'blaster':
-        return ["BLASTER"];
-      case 'warmup':
-        return ["WARMUP"];
-      case 'admin':
-      case 'superadmin':
-        return ["CRM", "BLASTER", "WARMUP"];
-      default:
-        return ["CRM"];
-    }
-  };
-
-  const availablePools = getAvailablePools();
-
-  // Filter jobs based on user role
-  const getFilteredJobs = () => {
-    if (!profile?.role) return [];
-    
-    if (profile.role === 'superadmin' || profile.role === 'admin') {
-      return jobs; // Admins see all campaigns
-    }
-    
-    // Regular users only see campaigns from their pool
-    return jobs.filter(job => availablePools.includes(job.pool));
-  };
-
-  const filteredJobs = getFilteredJobs();
-
-  // Mock data
+  // Mock data - initialize first
   const initialJobs: BroadcastJob[] = [
     {
       id: "1",
@@ -160,6 +125,41 @@ const Broadcast = () => {
   const [editingCampaign, setEditingCampaign] = useState<BroadcastJob | null>(null);
   const [deletingCampaignId, setDeletingCampaignId] = useState<string | null>(null);
 
+  // Filter available pools based on user role
+  const getAvailablePools = (): PoolType[] => {
+    if (!profile?.role) return ["CRM"];
+    
+    switch (profile.role) {
+      case 'crm':
+        return ["CRM"];
+      case 'blaster':
+        return ["BLASTER"];
+      case 'warmup':
+        return ["WARMUP"];
+      case 'admin':
+      case 'superadmin':
+        return ["CRM", "BLASTER", "WARMUP"];
+      default:
+        return ["CRM"];
+    }
+  };
+
+  const availablePools = getAvailablePools();
+
+  // Filter jobs based on user role
+  const getFilteredJobs = () => {
+    if (!profile?.role) return [];
+    
+    if (profile.role === 'superadmin' || profile.role === 'admin') {
+      return jobs; // Admins see all campaigns
+    }
+    
+    // Regular users only see campaigns from their pool
+    return jobs.filter(job => availablePools.includes(job.pool));
+  };
+
+  const filteredJobs = getFilteredJobs();
+
   const handleSaveCampaign = (campaignData: Partial<BroadcastJob>) => {
     if (editingCampaign) {
       // Update existing campaign
@@ -228,8 +228,6 @@ const Broadcast = () => {
             break;
         }
         
-        // Move toast to after state update to avoid setState during render
-
         return {
           ...job,
           status: newStatus as BroadcastStatus,
@@ -399,135 +397,135 @@ const Broadcast = () => {
           </Card>
         ) : (
           filteredJobs.map((job) => (
-          <Card key={job.id} className="shadow-card hover:shadow-elegant transition-all duration-300">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(job.status)}
-                  <div>
-                    <CardTitle className="text-lg">{job.name}</CardTitle>
-                    <div className="flex items-center space-x-2 mt-1">
-                      {getStatusBadge(job.status)}
-                      <Badge variant="outline" className="text-xs">
-                        {job.pool}
-                      </Badge>
+            <Card key={job.id} className="shadow-card hover:shadow-elegant transition-all duration-300">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    {getStatusIcon(job.status)}
+                    <div>
+                      <CardTitle className="text-lg">{job.name}</CardTitle>
+                      <div className="flex items-center space-x-2 mt-1">
+                        {getStatusBadge(job.status)}
+                        <Badge variant="outline" className="text-xs">
+                          {job.pool}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleEditCampaign(job)}
+                    >
+                      <Edit className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setDeletingCampaignId(job.id)}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Delete
+                    </Button>
+                    {job.status === "draft" && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleCampaignAction(job.id, "start")}
+                      >
+                        <Play className="h-3 w-3 mr-1" />
+                        Start
+                      </Button>
+                    )}
+                    {job.status === "running" && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleCampaignAction(job.id, "pause")}
+                      >
+                        <Pause className="h-3 w-3 mr-1" />
+                        Pause
+                      </Button>
+                    )}
+                    {job.status === "paused" && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleCampaignAction(job.id, "resume")}
+                      >
+                        <Play className="h-3 w-3 mr-1" />
+                        Resume
+                      </Button>
+                    )}
+                    {job.status === "failed" && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleCampaignAction(job.id, "retry")}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Retry
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      Stats
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Progress */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Progress</span>
+                      <span className="text-sm text-muted-foreground">{getProgress(job)}%</span>
+                    </div>
+                    <Progress value={getProgress(job)} className="h-2" />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{job.stats.sent} sent</span>
+                      <span>{job.stats.total} total</span>
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-lg font-bold text-success">{job.stats.sent}</div>
+                      <div className="text-xs text-muted-foreground">Sent</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-warning">{job.stats.pending}</div>
+                      <div className="text-xs text-muted-foreground">Pending</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-destructive">{job.stats.failed}</div>
+                      <div className="text-xs text-muted-foreground">Failed</div>
+                    </div>
+                  </div>
+
+                  {/* Details */}
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Sessions:</span>
+                      <span>{job.planJson.sessions.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Delay:</span>
+                      <span>{job.planJson.delayMin}-{job.planJson.delayMax}s</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Started:</span>
+                      <span>{job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : "Not started"}</span>
                     </div>
                   </div>
                 </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => handleEditCampaign(job)}
-                  >
-                    <Edit className="h-3 w-3 mr-1" />
-                    Edit
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => setDeletingCampaignId(job.id)}
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Delete
-                  </Button>
-                  {job.status === "draft" && (
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleCampaignAction(job.id, "start")}
-                    >
-                      <Play className="h-3 w-3 mr-1" />
-                      Start
-                    </Button>
-                  )}
-                  {job.status === "running" && (
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleCampaignAction(job.id, "pause")}
-                    >
-                      <Pause className="h-3 w-3 mr-1" />
-                      Pause
-                    </Button>
-                  )}
-                  {job.status === "paused" && (
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleCampaignAction(job.id, "resume")}
-                    >
-                      <Play className="h-3 w-3 mr-1" />
-                      Resume
-                    </Button>
-                    )}
-                  {job.status === "failed" && (
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleCampaignAction(job.id, "retry")}
-                    >
-                      <RotateCcw className="h-3 w-3 mr-1" />
-                      Retry
-                    </Button>
-                  )}
-                  <Button size="sm" variant="outline">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    Stats
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Progress */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Progress</span>
-                    <span className="text-sm text-muted-foreground">{getProgress(job)}%</span>
-                  </div>
-                  <Progress value={getProgress(job)} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{job.stats.sent} sent</span>
-                    <span>{job.stats.total} total</span>
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-lg font-bold text-success">{job.stats.sent}</div>
-                    <div className="text-xs text-muted-foreground">Sent</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold text-warning">{job.stats.pending}</div>
-                    <div className="text-xs text-muted-foreground">Pending</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold text-destructive">{job.stats.failed}</div>
-                    <div className="text-xs text-muted-foreground">Failed</div>
-                  </div>
-                </div>
-
-                {/* Details */}
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Sessions:</span>
-                    <span>{job.planJson.sessions.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Delay:</span>
-                    <span>{job.planJson.delayMin}-{job.planJson.delayMax}s</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Started:</span>
-                    <span>{job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : "Not started"}</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
           ))
         )}
       </div>
