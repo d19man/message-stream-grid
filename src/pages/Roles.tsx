@@ -209,19 +209,67 @@ const Roles = () => {
                    </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                {selectedRole.permissions.includes("*") ? (
-                  <div className="text-center py-8">
-                    <Crown className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-foreground mb-2">Super Admin</h3>
-                    <p className="text-muted-foreground">
-                      This role has full system access with all permissions
-                    </p>
-                    <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 mt-4">
-                      All Permissions Granted
-                    </Badge>
-                  </div>
+               <CardContent>
+                 {selectedRole.permissions.includes("*") ? (
+                   <div className="text-center py-8">
+                     <Crown className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                     <h3 className="text-lg font-semibold text-foreground mb-2">Super Admin</h3>
+                     <p className="text-muted-foreground">
+                       This role has full system access with all permissions
+                     </p>
+                     <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 mt-4">
+                       All Permissions Granted
+                     </Badge>
+                   </div>
+                 ) : profile?.role === "superadmin" ? (
+                   // Superadmin sees full permission management interface
+                   <div className="space-y-6">
+                     {allPermissions.map((group) => (
+                       <div key={group.group}>
+                         <h4 className="font-medium text-foreground mb-3 flex items-center space-x-2">
+                           <Lock className="h-4 w-4" />
+                           <span>{group.group}</span>
+                         </h4>
+                         <div className="grid grid-cols-1 gap-2 ml-6">
+                           {group.permissions.map((permission) => (
+                             <div key={permission} className="flex items-center space-x-2">
+                               <Checkbox
+                                 id={permission}
+                                 checked={hasPermission(selectedRole, permission)}
+                                 disabled={!isEditing}
+                               />
+                               <label
+                                 htmlFor={permission}
+                                 className={`text-sm ${
+                                   hasPermission(selectedRole, permission)
+                                     ? "text-foreground"
+                                     : "text-muted-foreground"
+                                 }`}
+                               >
+                                 {permission.replace(":", " → ").replace("_", " ")}
+                               </label>
+                               {hasPermission(selectedRole, permission) && (
+                                 <Unlock className="h-3 w-3 text-success" />
+                               )}
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     ))}
+                     
+                     {isEditing && (
+                       <div className="flex space-x-2 pt-4 border-t">
+                         <Button className="bg-gradient-primary hover:opacity-90" size="sm">
+                           Save Changes
+                         </Button>
+                         <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                           Cancel
+                         </Button>
+                       </div>
+                     )}
+                   </div>
                  ) : (
+                   // Admin and other users only see granted permissions
                    <div className="space-y-6">
                      {/* Only show permission groups that have granted permissions */}
                      {allPermissions
@@ -249,20 +297,9 @@ const Roles = () => {
                          </div>
                        </div>
                      ))}
-                     
-                     {isEditing && profile?.role === "superadmin" && (
-                       <div className="flex space-x-2 pt-4 border-t">
-                         <Button className="bg-gradient-primary hover:opacity-90" size="sm">
-                           Save Changes
-                         </Button>
-                         <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
-                           Cancel
-                         </Button>
-                       </div>
-                     )}
                    </div>
                  )}
-              </CardContent>
+               </CardContent>
             </Card>
           ) : (
             <Card className="shadow-card">
