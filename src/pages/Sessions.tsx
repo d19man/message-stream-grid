@@ -14,138 +14,91 @@ import {
   Zap,
   Send,
   KeyRound,
+  Loader2,
+  Info,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SessionDialog } from "@/components/sessions/SessionDialog";
 import { QRDialog } from "@/components/sessions/QRDialog";
 import { PairingDialog } from "@/components/sessions/PairingDialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Session, PoolType, SessionStatus } from "@/types";
+import { useSessions, Session } from "@/hooks/useSessions";
+import { useAuth } from "@/contexts/AuthContext";
+import type { PoolType } from "@/types";
 
 const Sessions = () => {
   const [activeTab, setActiveTab] = useState<PoolType>("CRM");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, profile } = useAuth();
+  const { sessions, loading, createSession, deleteSession, updateSession } = useSessions();
   
-  // Mock data
-  const initialSessions: Session[] = [
-    {
-      id: "1",
-      name: "CRM-Main",
-      pool: "CRM",
-      status: "connected",
-      phone: "+1234567890",
-      lastSeen: "2 min ago",
-      userId: "user1",
-      createdAt: "2024-01-15T10:00:00Z",
-      updatedAt: "2024-01-15T10:00:00Z",
-    },
-    {
-      id: "2",
-      name: "CRM-Support",
-      pool: "CRM",
-      status: "disconnected",
-      phone: "+1234567891",
-      lastSeen: "1 hour ago",
-      userId: "user1",
-      createdAt: "2024-01-15T09:00:00Z",
-      updatedAt: "2024-01-15T09:00:00Z",
-    },
-    {
-      id: "3",
-      name: "Blast-Campaign",
-      pool: "BLASTER",
-      status: "connected",
-      phone: "+1234567892",
-      lastSeen: "Active now",
-      userId: "user1",
-      createdAt: "2024-01-15T08:00:00Z",
-      updatedAt: "2024-01-15T08:00:00Z",
-    },
-    {
-      id: "4",
-      name: "Warmup-01",
-      pool: "WARMUP",
-      status: "connecting",
-      userId: "user1",
-      createdAt: "2024-01-15T07:00:00Z",
-      updatedAt: "2024-01-15T07:00:00Z",
-    },
-  ];
-
-  const [sessions, setSessions] = useState<Session[]>(initialSessions);
-
-  const handleSaveSession = (sessionData: Partial<Session> & { connectionMethod?: string }) => {
-    const status = sessionData.connectionMethod === "pairing" ? "pairing" : "qr_ready";
-    const newSession: Session = {
-      id: Date.now().toString(),
-      name: sessionData.name!,
-      pool: sessionData.pool!,
-      status: status as SessionStatus,
-      userId: "user1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setSessions(prev => [...prev, newSession]);
-  };
-
-  const handleDeleteSession = (id: string) => {
-    if (confirm("Are you sure you want to delete this session? This action cannot be undone.")) {
-      setSessions(prev => prev.filter(s => s.id !== id));
+  const handleSaveSession = async (sessionData: Partial<Session>) => {
+    const result = await createSession({
+      name: sessionData.name || "New Session",
+      pool: sessionData.pool || activeTab,
+    });
+    
+    if (result) {
       toast({
-        title: "Success",
-        description: "Session deleted successfully!",
+        title: "Session Created",
+        description: `Session "${result.name}" has been created.`
       });
     }
   };
 
-  const handleReconnect = (sessionId: string) => {
-    setSessions(prev => prev.map(s => 
-      s.id === sessionId ? { ...s, status: "connecting" as SessionStatus, updatedAt: new Date().toISOString() } : s
-    ));
-    toast({
-      title: "Reconnecting",
-      description: "Attempting to reconnect session...",
-    });
-    
-    // Simulate reconnection process
-    setTimeout(() => {
-      setSessions(prev => prev.map(s => 
-        s.id === sessionId ? { ...s, status: "qr_ready" as SessionStatus } : s
-      ));
-    }, 2000);
+  const handleDeleteSession = async (id: string) => {
+    if (confirm("Are you sure you want to delete this session? This action cannot be undone.")) {
+      const success = await deleteSession(id);
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Session deleted successfully!",
+        });
+      }
+    }
+  };
+
+  const handleReconnect = async (sessionId: string) => {
+    const result = await updateSession(sessionId, { status: "connecting" });
+    if (result) {
+      toast({
+        title: "Reconnecting",
+        description: "Attempting to reconnect session...",
+      });
+      
+      // Simulate reconnection process
+      setTimeout(async () => {
+        await updateSession(sessionId, { status: "disconnected" });
+      }, 2000);
+    }
   };
 
   const handleNewCampaign = () => {
     navigate("/broadcast");
   };
 
-  const getStatusIcon = (status: SessionStatus) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "connected":
         return <Wifi className="h-4 w-4 text-success" />;
       case "disconnected":
         return <WifiOff className="h-4 w-4 text-destructive" />;
       case "connecting":
-      case "qr_ready":
-      case "pairing":
         return <RotateCcw className="h-4 w-4 text-warning animate-spin" />;
       default:
         return <WifiOff className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
-  const getStatusBadge = (status: SessionStatus) => {
+  const getStatusBadge = (status: string) => {
     const statusConfig = {
       connected: { variant: "default" as const, className: "bg-success text-success-foreground" },
       disconnected: { variant: "destructive" as const, className: "" },
       connecting: { variant: "secondary" as const, className: "bg-warning text-warning-foreground" },
-      qr_ready: { variant: "secondary" as const, className: "bg-warning text-warning-foreground" },
-      pairing: { variant: "secondary" as const, className: "bg-warning text-warning-foreground" },
-      error: { variant: "destructive" as const, className: "" },
     };
 
-    const config = statusConfig[status];
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.disconnected;
     return (
       <Badge variant={config.variant} className={config.className}>
         {status.replace("_", " ").toUpperCase()}
@@ -153,13 +106,39 @@ const Sessions = () => {
     );
   };
 
-  const filteredSessions = sessions.filter(session => session.pool === activeTab);
+  // Filter sessions based on user role and assignment
+  const getUserSessions = () => {
+    if (!user) return [];
+    
+    if (profile?.role === "superadmin") {
+      return sessions; // Superadmin sees all sessions
+    } else if (profile?.role === "admin") {
+      return sessions.filter(s => s.admin_id === user.id || s.user_id === user.id);
+    } else {
+      return sessions.filter(s => s.user_id === user.id); // Regular users only see their assigned sessions
+    }
+  };
+
+  const filteredSessions = getUserSessions().filter(session => session.pool === activeTab);
+  const allUserSessions = getUserSessions();
 
   const poolStats = {
-    CRM: { total: sessions.filter(s => s.pool === "CRM").length, connected: sessions.filter(s => s.pool === "CRM" && s.status === "connected").length },
-    BLASTER: { total: sessions.filter(s => s.pool === "BLASTER").length, connected: sessions.filter(s => s.pool === "BLASTER" && s.status === "connected").length },
-    WARMUP: { total: sessions.filter(s => s.pool === "WARMUP").length, connected: sessions.filter(s => s.pool === "WARMUP" && s.status === "connected").length },
+    CRM: { total: allUserSessions.filter(s => s.pool === "CRM").length, connected: allUserSessions.filter(s => s.pool === "CRM" && s.status === "connected").length },
+    BLASTER: { total: allUserSessions.filter(s => s.pool === "BLASTER").length, connected: allUserSessions.filter(s => s.pool === "BLASTER" && s.status === "connected").length },
+    WARMUP: { total: allUserSessions.filter(s => s.pool === "WARMUP").length, connected: allUserSessions.filter(s => s.pool === "WARMUP" && s.status === "connected").length },
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading sessions...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -177,6 +156,19 @@ const Sessions = () => {
           <SessionDialog onSave={handleSaveSession} />
         </div>
       </div>
+
+      {/* Info Banner for Users */}
+      {profile?.role !== "superadmin" && (
+        <div className="flex items-center space-x-2 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <span className="text-sm text-blue-700 dark:text-blue-300">
+            {profile?.role === "admin" 
+              ? "These are sessions assigned to you and your users by Super Admin"
+              : "These are sessions assigned to you by your Admin"
+            }
+          </span>
+        </div>
+      )}
 
       {/* Pool Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PoolType)}>
@@ -241,32 +233,10 @@ const Sessions = () => {
                       )}
                       <div>
                         <p className="text-sm text-muted-foreground">Last Seen</p>
-                        <p className="text-sm">{session.lastSeen || "Never"}</p>
+                        <p className="text-sm">{session.last_seen || "Never"}</p>
                       </div>
                       
                       <div className="flex space-x-2 pt-2">
-                        {session.status === "qr_ready" && (
-                          <QRDialog 
-                            sessionName={session.name}
-                            trigger={
-                              <Button size="sm" variant="outline" className="flex-1">
-                                <QrCode className="h-3 w-3 mr-1" />
-                                QR Code
-                              </Button>
-                            }
-                          />
-                        )}
-                        {session.status === "pairing" && (
-                          <PairingDialog 
-                            sessionName={session.name}
-                            trigger={
-                              <Button size="sm" variant="outline" className="flex-1">
-                                <KeyRound className="h-3 w-3 mr-1" />
-                                Pairing Code
-                              </Button>
-                            }
-                          />
-                        )}
                         {session.status === "disconnected" && (
                           <Button 
                             size="sm" 

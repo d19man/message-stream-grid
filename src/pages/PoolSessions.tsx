@@ -171,11 +171,26 @@ const PoolSessions = () => {
     }
   };
 
-  const filteredSessions = sessions.filter(session => session.pool === activeTab);
+  // Filter sessions based on user role and assignment status for Pool Sessions
+  const getPoolSessions = () => {
+    if (profile?.role === "superadmin") {
+      return sessions; // Superadmin sees all sessions in pool
+    } else if (profile?.role === "admin") {
+      // Admin sees sessions that are assigned to them or not yet assigned to users
+      return sessions.filter(s => s.admin_id === user?.id || (!s.user_id && !s.admin_id));
+    } else {
+      // Regular users don't access pool sessions
+      return [];
+    }
+  };
+
+  const filteredSessions = getPoolSessions().filter(session => session.pool === activeTab);
+  const allPoolSessions = getPoolSessions();
+  
   const poolStats = {
-    CRM: sessions.filter(s => s.pool === "CRM"),
-    BLASTER: sessions.filter(s => s.pool === "BLASTER"), 
-    WARMUP: sessions.filter(s => s.pool === "WARMUP")
+    CRM: allPoolSessions.filter(s => s.pool === "CRM"),
+    BLASTER: allPoolSessions.filter(s => s.pool === "BLASTER"), 
+    WARMUP: allPoolSessions.filter(s => s.pool === "WARMUP")
   };
 
   // Show loading state
