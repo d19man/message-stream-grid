@@ -121,20 +121,25 @@ const Users = () => {
       return;
     }
 
-    // Admin cannot delete superadmin or other admins (except their own subordinates)
-    if (profile?.role === 'admin' && userToDelete.role === 'superadmin') {
-      toast({ title: "Access Denied", description: "Cannot delete superadmin users", variant: "destructive" });
-      return;
-    }
-
-    if (profile?.role === 'admin' && userToDelete.role === 'admin') {
-      toast({ title: "Access Denied", description: "Cannot delete other admin users", variant: "destructive" });
-      return;
-    }
-
-    if (profile?.role === 'admin' && userToDelete.admin_id !== profile?.id) {
-      toast({ title: "Access Denied", description: "Can only delete your own users", variant: "destructive" });
-      return;
+    // Role-based delete permissions
+    if (profile?.role === 'admin') {
+      // Admin cannot delete superadmin users
+      if (userToDelete.role === 'superadmin') {
+        toast({ title: "Access Denied", description: "Cannot delete superadmin users", variant: "destructive" });
+        return;
+      }
+      
+      // Admin cannot delete other admin users
+      if (userToDelete.role === 'admin') {
+        toast({ title: "Access Denied", description: "Cannot delete other admin users", variant: "destructive" });
+        return;
+      }
+      
+      // Admin can only delete their own subordinate users (crm, blast, warmup, user roles)
+      if (userToDelete.admin_id !== profile?.id) {
+        toast({ title: "Access Denied", description: "Can only delete users you created", variant: "destructive" });
+        return;
+      }
     }
 
     if (confirm(`Delete ${userToDelete.email}?`)) {
