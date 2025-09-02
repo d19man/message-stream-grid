@@ -31,11 +31,48 @@ import {
 } from "lucide-react";
 import { CampaignDialog } from "@/components/broadcast/CampaignDialog";
 import { useToast } from "@/hooks/use-toast";
-import type { BroadcastJob, BroadcastStatus } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+import type { BroadcastJob, BroadcastStatus, PoolType } from "@/types";
 
 const Broadcast = () => {
   const { toast } = useToast();
+  const { profile } = useAuth();
   
+  // Filter available pools based on user role
+  const getAvailablePools = (): PoolType[] => {
+    if (!profile?.role) return ["CRM"];
+    
+    switch (profile.role) {
+      case 'crm':
+        return ["CRM"];
+      case 'blaster':
+        return ["BLASTER"];
+      case 'warmup':
+        return ["WARMUP"];
+      case 'admin':
+      case 'superadmin':
+        return ["CRM", "BLASTER", "WARMUP"];
+      default:
+        return ["CRM"];
+    }
+  };
+
+  const availablePools = getAvailablePools();
+
+  // Filter jobs based on user role
+  const getFilteredJobs = () => {
+    if (!profile?.role) return [];
+    
+    if (profile.role === 'superadmin' || profile.role === 'admin') {
+      return jobs; // Admins see all campaigns
+    }
+    
+    // Regular users only see campaigns from their pool
+    return jobs.filter(job => availablePools.includes(job.pool));
+  };
+
+  const filteredJobs = getFilteredJobs();
+
   // Mock data
   const initialJobs: BroadcastJob[] = [
     {
@@ -249,7 +286,8 @@ const Broadcast = () => {
     return Math.round((job.stats.sent / job.stats.total) * 100);
   };
 
-  const totalStats = jobs.reduce(
+  // Calculate stats based on filtered jobs (role-based)
+  const totalStats = filteredJobs.reduce(
     (acc, job) => ({
       total: acc.total + job.stats.total,
       sent: acc.sent + job.stats.sent,
@@ -265,7 +303,14 @@ const Broadcast = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Broadcast</h1>
-          <p className="text-muted-foreground">Manage your broadcast campaigns</p>
+          <p className="text-muted-foreground">
+            {profile?.role === 'superadmin' 
+              ? 'Manage all broadcast campaigns across pools'
+              : profile?.role === 'admin'
+              ? 'Manage broadcast campaigns for your teams'  
+              : `Manage your ${availablePools.join(', ')} broadcast campaigns`
+            }
+          </p>
         </div>
         <CampaignDialog 
           onSave={handleSaveCampaign} 
@@ -284,7 +329,7 @@ const Broadcast = () => {
           <CardContent>
             <div className="text-2xl font-bold">{totalStats.total.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {jobs.length} active campaigns
+              {filteredJobs.length} campaign{filteredJobs.length !== 1 ? 's' : ''} ({availablePools.join(', ')})
             </p>
           </CardContent>
         </Card>
@@ -297,7 +342,7 @@ const Broadcast = () => {
           <CardContent>
             <div className="text-2xl font-bold text-success">{totalStats.sent.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((totalStats.sent / totalStats.total) * 100)}% success rate
+              {totalStats.total > 0 ? Math.round((totalStats.sent / totalStats.total) * 100) : 0}% success rate
             </p>
           </CardContent>
         </Card>
@@ -323,7 +368,7 @@ const Broadcast = () => {
           <CardContent>
             <div className="text-2xl font-bold text-destructive">{totalStats.failed.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((totalStats.failed / totalStats.total) * 100)}% failure rate
+              {totalStats.total > 0 ? Math.round((totalStats.failed / totalStats.total) * 100) : 0}% failure rate
             </p>
           </CardContent>
         </Card>
@@ -331,7 +376,29 @@ const Broadcast = () => {
 
       {/* Campaign List */}
       <div className="space-y-4">
-        {jobs.map((job) => (
+        {filteredJobs.length === 0 ? (
+          <Card className="shadow-card">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Send className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">No Campaigns Yet</h3>
+              <p className="text-muted-foreground text-center mb-4">
+                Create your first {availablePools.join(' or ')} campaign to start broadcasting
+              </p>
+              <CampaignDialog 
+                onSave={handleSaveCampaign} 
+                editingCampaign={editingCampaign}
+                onEditCancel={() => setEditingCampaign(null)}
+                trigger={
+                  <Button className="bg-gradient-primary hover:opacity-90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Campaign
+                  </Button>
+                }
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          filteredJobs.map((job) => (
           <Card key={job.id} className="shadow-card hover:shadow-elegant transition-all duration-300">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -461,7 +528,8 @@ const Broadcast = () => {
               </div>
             </CardContent>
           </Card>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Delete Confirmation Dialog */}
