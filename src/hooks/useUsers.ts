@@ -7,7 +7,7 @@ export interface User {
   id: string;
   email: string;
   full_name?: string;
-  role: "superadmin" | "admin" | "user";
+  role: "superadmin" | "admin" | "user" | "crm" | "blaster" | "warmup";
   admin_id?: string;
   created_at: string;
   updated_at: string;
@@ -40,7 +40,7 @@ export const useUsers = () => {
       // Filter users based on current user's role
       let filteredUsers = (data || []).map(user => ({
         ...user,
-        role: user.role as "superadmin" | "admin" | "user"
+        role: user.role as "superadmin" | "admin" | "user" | "crm" | "blaster" | "warmup"
       }));
 
       if (profile?.role === 'admin') {
@@ -74,11 +74,10 @@ export const useUsers = () => {
   const getUsersByPool = (pool: "CRM" | "BLASTER" | "WARMUP") => {
     // Filter users based on their role and admin relationship
     const poolUsers = users.filter(user => {
-      // Only return regular users (not admin/superadmin)
-      if (user.role !== 'user') return false;
+      // Return users that are not admin/superadmin (include 'user', 'crm', 'blaster', 'warmup' roles)
+      if (['admin', 'superadmin'].includes(user.role)) return false;
       
-      // For now, return all regular users since we don't have pool-specific roles yet
-      // Later you can add a pool_type field to profiles table if needed
+      // Include all non-admin users since we don't have strict pool-specific roles yet
       return true;
     });
     
