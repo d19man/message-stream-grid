@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { PoolType } from "@/types";
 
 const Sessions = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user, profile } = useAuth();
+  const { sessions, loading, createSession, deleteSession, updateSession } = useSessions();
+
   // Filter available pools based on user role
   const getAvailablePools = (): PoolType[] => {
     if (!profile?.role) return ["CRM"];
@@ -64,11 +69,15 @@ const Sessions = () => {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<PoolType>(getDefaultPool());
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { user, profile } = useAuth();
-  const { sessions, loading, createSession, deleteSession, updateSession } = useSessions();
+  const [activeTab, setActiveTab] = useState<PoolType>("CRM");
+
+  // Update active tab when profile loads
+  useEffect(() => {
+    if (profile?.role) {
+      const defaultPool = getDefaultPool();
+      setActiveTab(defaultPool);
+    }
+  }, [profile?.role]);
   
   const handleSaveSession = async (sessionData: Partial<Session>) => {
     const result = await createSession({
