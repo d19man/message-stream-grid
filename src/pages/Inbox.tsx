@@ -150,6 +150,16 @@ const Inbox = () => {
     };
   }, [profile?.id]);
 
+  // Define thread type
+  type ThreadType = {
+    id: string;
+    contactPhone: string;
+    contactName: string;
+    lastMessage: any;
+    unreadCount: number;
+    pool: string;
+  };
+
   // Group messages into threads by phone number
   const threads = messages.reduce((acc, msg) => {
     const threadId = msg.is_from_me ? msg.to_number : msg.from_number;
@@ -175,9 +185,9 @@ const Inbox = () => {
     }
     
     return acc;
-  }, {} as Record<string, any>);
+  }, {} as Record<string, ThreadType>);
 
-  const filteredThreads = Object.values(threads).filter((thread: any) => {
+  const filteredThreads = (Object.values(threads) as ThreadType[]).filter((thread) => {
     if (searchQuery) {
       return thread.contactPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
              thread.contactName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -189,21 +199,21 @@ const Inbox = () => {
     <div className="h-[calc(100vh-200px)] animate-fade-in">
       <div className="flex h-full">
         {/* Sidebar - Thread List */}
-        <div className="w-80 border-r border-border bg-card">
-          <div className="p-4 border-b border-border">
-            <h1 className="text-xl font-bold mb-4">Inbox</h1>
+        <div className="w-96 border-r border-border bg-card flex flex-col">
+          <div className="p-6 border-b border-border">
+            <h1 className="text-2xl font-bold mb-4">Inbox</h1>
             
             {/* Pool Tabs - Only show pools available to user */}
             <Tabs value={selectedPool} onValueChange={(value) => setSelectedPool(value as PoolType)}>
               <TabsList className={`grid w-full ${availablePools.length === 1 ? 'grid-cols-1' : availablePools.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
                 {availablePools.includes("CRM") && (
-                  <TabsTrigger value="CRM" className="text-xs">CRM</TabsTrigger>
+                  <TabsTrigger value="CRM" className="text-sm">CRM Pool</TabsTrigger>
                 )}
                 {availablePools.includes("BLASTER") && (
-                  <TabsTrigger value="BLASTER" className="text-xs">BLAST</TabsTrigger>
+                  <TabsTrigger value="BLASTER" className="text-sm">Blast Pool</TabsTrigger>
                 )}
                 {availablePools.includes("WARMUP") && (
-                  <TabsTrigger value="WARMUP" className="text-xs">WARM</TabsTrigger>
+                  <TabsTrigger value="WARMUP" className="text-sm">Warmup Pool</TabsTrigger>
                 )}
               </TabsList>
             </Tabs>
@@ -218,60 +228,74 @@ const Inbox = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+
+            {/* Stats */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="bg-muted/30 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground">Total Chats</p>
+                <p className="text-lg font-semibold">{filteredThreads.length}</p>
+              </div>
+              <div className="bg-muted/30 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground">Unread</p>
+                <p className="text-lg font-semibold text-primary">
+                  {filteredThreads.reduce((acc, thread) => acc + thread.unreadCount, 0)}
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Thread List */}
-          <div className="overflow-y-auto">
+          <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="p-4 text-center">
-                <Loader2 className="h-6 w-6 text-muted-foreground mx-auto mb-2 animate-spin" />
+              <div className="p-6 text-center">
+                <Loader2 className="h-8 w-8 text-muted-foreground mx-auto mb-3 animate-spin" />
                 <p className="text-sm text-muted-foreground">Loading conversations...</p>
               </div>
             ) : filteredThreads.length === 0 ? (
-              <div className="p-4 text-center">
-                <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
+              <div className="p-6 text-center">
+                <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-base font-medium text-muted-foreground mb-2">
                   {searchQuery ? "No conversations found" : "No conversations yet"}
                 </p>
                 {!searchQuery && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-sm text-muted-foreground">
                     Messages will appear here when you receive WhatsApp messages
                   </p>
                 )}
               </div>
             ) : (
-              filteredThreads.map((thread: any) => (
+              filteredThreads.map((thread) => (
                 <div
                   key={thread.id}
-                  className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 transition-colors ${
-                    selectedThread === thread.id ? "bg-muted" : ""
+                  className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 transition-all duration-200 ${
+                    selectedThread === thread.id ? "bg-primary/10 border-l-4 border-l-primary" : ""
                   }`}
                   onClick={() => setSelectedThread(thread.id)}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-                        <span className="text-xs font-semibold text-primary-foreground">
-                          {thread.contactName?.charAt(0) || "?"}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{thread.contactName || "Unknown"}</p>
-                        <p className="text-xs text-muted-foreground">{thread.contactPhone}</p>
-                      </div>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-semibold text-primary-foreground">
+                        {thread.contactName?.charAt(0) || "?"}
+                      </span>
                     </div>
-                    {thread.unreadCount > 0 && (
-                      <Badge className="bg-primary text-primary-foreground text-xs">
-                        {thread.unreadCount}
-                      </Badge>
-                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-semibold text-sm truncate">{thread.contactName || "Unknown Contact"}</p>
+                        {thread.unreadCount > 0 && (
+                          <Badge className="bg-primary text-primary-foreground text-xs ml-2">
+                            {thread.unreadCount}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">{thread.contactPhone}</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {thread.lastMessage.message_text || "📎 Media message"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(thread.lastMessage.timestamp).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {thread.lastMessage.message_text || "Media message"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(thread.lastMessage.timestamp).toLocaleTimeString()}
-                  </p>
                 </div>
               ))
             )}
@@ -279,28 +303,32 @@ const Inbox = () => {
         </div>
 
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col bg-background">
           {selectedThread ? (
             <>
               {/* Chat Header */}
-              <div className="p-4 border-b border-border bg-card">
+              <div className="p-6 border-b border-border bg-card">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-                      <span className="text-sm font-semibold text-primary-foreground">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-14 h-14 bg-gradient-primary rounded-full flex items-center justify-center">
+                      <span className="text-lg font-semibold text-primary-foreground">
                         {threads[selectedThread]?.contactName?.charAt(0) || "?"}
                       </span>
                     </div>
                     <div>
-                      <h3 className="font-semibold">{threads[selectedThread]?.contactName || "Unknown"}</h3>
+                      <h3 className="text-xl font-semibold">{threads[selectedThread]?.contactName || "Unknown Contact"}</h3>
                       <p className="text-sm text-muted-foreground">{threads[selectedThread]?.contactPhone}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Last seen: {new Date(threads[selectedThread]?.lastMessage?.timestamp).toLocaleString()}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm">
-                      <Phone className="h-4 w-4" />
+                  <div className="flex items-center space-x-3">
+                    <Button variant="outline" size="default">
+                      <Phone className="h-4 w-4 mr-2" />
+                      Call
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="default">
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </div>
@@ -308,7 +336,7 @@ const Inbox = () => {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-b from-background to-muted/20">
                 {messages
                   .filter(msg => {
                     const threadId = msg.is_from_me ? msg.to_number : msg.from_number;
@@ -321,46 +349,80 @@ const Inbox = () => {
                       className={`flex ${message.is_from_me ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        className={`max-w-md lg:max-w-lg px-4 py-3 rounded-2xl shadow-sm ${
                           message.is_from_me
                             ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
+                            : "bg-card text-card-foreground border"
                         }`}
                       >
-                        <p className="text-sm">{message.message_text || "Media message"}</p>
-                        <p className="text-xs opacity-70 mt-1">
-                          {new Date(message.timestamp).toLocaleTimeString()}
+                        <p className="text-sm leading-relaxed">{message.message_text || "📎 Media message"}</p>
+                        <p className="text-xs opacity-70 mt-2">
+                          {new Date(message.timestamp).toLocaleString()}
                         </p>
                       </div>
                     </div>
                   ))}
+                
+                {/* Empty state for selected conversation */}
+                {messages.filter(msg => {
+                  const threadId = msg.is_from_me ? msg.to_number : msg.from_number;
+                  return threadId === selectedThread;
+                }).length === 0 && (
+                  <div className="text-center py-12">
+                    <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-medium text-muted-foreground mb-2">No messages yet</p>
+                    <p className="text-sm text-muted-foreground">Start a conversation by sending a message</p>
+                  </div>
+                )}
               </div>
 
               {/* Message Input */}
-              <div className="p-4 border-t border-border bg-card">
-                <div className="flex items-center space-x-2">
-                  <Button variant="ghost" size="sm">
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <Image className="h-4 w-4" />
-                  </Button>
+              <div className="p-6 border-t border-border bg-card">
+                <div className="flex items-end space-x-3">
+                  <div className="flex space-x-2">
+                    <Button variant="ghost" size="sm">
+                      <Paperclip className="h-5 w-5" />
+                    </Button>
+                    <Button variant="ghost" size="sm">
+                      <Image className="h-5 w-5" />
+                    </Button>
+                  </div>
                   <Input
-                    placeholder="Type a message..."
-                    className="flex-1"
+                    placeholder="Type your message..."
+                    className="flex-1 min-h-[44px] resize-none"
                   />
-                  <Button size="sm" className="bg-gradient-primary hover:opacity-90">
-                    <Send className="h-4 w-4" />
+                  <Button size="default" className="bg-gradient-primary hover:opacity-90 px-6">
+                    <Send className="h-4 w-4 mr-2" />
+                    Send
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Press Enter to send • Shift+Enter for new line
+                </p>
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">Select a Conversation</h3>
-                <p className="text-muted-foreground">Choose a conversation from the list to start messaging</p>
+            <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-background to-muted/30">
+              <div className="text-center max-w-md">
+                <div className="w-24 h-24 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-6">
+                  <MessageSquare className="h-12 w-12 text-primary-foreground" />
+                </div>
+                <h3 className="text-2xl font-semibold text-foreground mb-3">Select a Conversation</h3>
+                <p className="text-muted-foreground text-lg leading-relaxed">
+                  Choose a conversation from the list to start messaging with your contacts
+                </p>
+                <div className="mt-8 grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                  <div className="bg-card rounded-lg p-4 border">
+                    <div className="text-2xl font-bold text-primary">{filteredThreads.length}</div>
+                    <div>Total Conversations</div>
+                  </div>
+                  <div className="bg-card rounded-lg p-4 border">
+                    <div className="text-2xl font-bold text-primary">
+                      {filteredThreads.reduce((acc, thread) => acc + thread.unreadCount, 0)}
+                    </div>
+                    <div>Unread Messages</div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
