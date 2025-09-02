@@ -160,20 +160,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         
         if (['crm', 'blaster', 'warmup'].includes(profileData.role) && profileData.admin_id) {
-          // Get admin's subscription info using service role to bypass RLS
+          // Get admin's subscription info
           console.log('Checking admin subscription for user:', {
             userEmail: profileData.email,
             userRole: profileData.role,
             adminId: profileData.admin_id
           });
           
-          // Use service role client to bypass RLS restrictions
-          const serviceRoleClient = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-          );
-          
-          const { data: adminProfile, error: adminError } = await serviceRoleClient
+          const { data: adminProfile, error: adminError } = await supabase
             .from('profiles')
             .select('subscription_type, subscription_end, subscription_active, email, full_name')
             .eq('id', profileData.admin_id)

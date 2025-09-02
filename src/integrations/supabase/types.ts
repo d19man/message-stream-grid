@@ -70,6 +70,36 @@ export type Database = {
           },
         ]
       }
+      roles: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_system_role: boolean | null
+          name: string
+          permissions: Database["public"]["Enums"]["app_permission"][]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_system_role?: boolean | null
+          name: string
+          permissions?: Database["public"]["Enums"]["app_permission"][]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_system_role?: boolean | null
+          name?: string
+          permissions?: Database["public"]["Enums"]["app_permission"][]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           admin_id: string | null
@@ -152,6 +182,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_user_permissions: {
+        Args: { user_id: string }
+        Returns: Database["public"]["Enums"]["app_permission"][]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -163,8 +197,41 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      user_has_permission: {
+        Args: {
+          permission: Database["public"]["Enums"]["app_permission"]
+          user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_permission:
+        | "manage:user"
+        | "view:user"
+        | "manage:role"
+        | "view:role"
+        | "manage:session"
+        | "view:session"
+        | "view:pool-session"
+        | "create:pool-session"
+        | "transfer:pool-session"
+        | "delete:pool-session"
+        | "purge:pool-session"
+        | "manage:inbox:crm"
+        | "view:inbox:crm"
+        | "manage:inbox:blaster"
+        | "view:inbox:blaster"
+        | "manage:inbox:warmup"
+        | "view:inbox:warmup"
+        | "manage:broadcast"
+        | "view:broadcast"
+        | "start:blast"
+        | "stop:blast"
+        | "manage:template"
+        | "view:template"
+        | "manage:ai"
+        | "view:ai"
       app_role: "superadmin" | "admin" | "user" | "crm" | "blaster" | "warmup"
       subscription_type:
         | "lifetime"
@@ -303,6 +370,33 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_permission: [
+        "manage:user",
+        "view:user",
+        "manage:role",
+        "view:role",
+        "manage:session",
+        "view:session",
+        "view:pool-session",
+        "create:pool-session",
+        "transfer:pool-session",
+        "delete:pool-session",
+        "purge:pool-session",
+        "manage:inbox:crm",
+        "view:inbox:crm",
+        "manage:inbox:blaster",
+        "view:inbox:blaster",
+        "manage:inbox:warmup",
+        "view:inbox:warmup",
+        "manage:broadcast",
+        "view:broadcast",
+        "start:blast",
+        "stop:blast",
+        "manage:template",
+        "view:template",
+        "manage:ai",
+        "view:ai",
+      ],
       app_role: ["superadmin", "admin", "user", "crm", "blaster", "warmup"],
       subscription_type: [
         "lifetime",
