@@ -39,16 +39,20 @@ import { ShareSessionDialog } from "@/components/sessions/ShareSessionDialog";
 import { ShareToUserDialog } from "@/components/sessions/ShareToUserDialog";
 
 // Mock current user - in real app, this would come from auth context
-const getCurrentUser = (role: "Super Admin" | "Admin"): User & { role: Role } => ({
+const getCurrentUser = (role: "Super Admin" | "Admin" | "CRM" | "Blaster" | "Warmup"): User & { role: Role } => ({
   id: "current-user",
   email: "admin@example.com",
   name: "John Smith",
-  roleId: role === "Super Admin" ? "1" : "2",
+  roleId: role === "Super Admin" ? "1" : role === "Admin" ? "2" : "3",
   role: {
-    id: role === "Super Admin" ? "1" : "2",
+    id: role === "Super Admin" ? "1" : role === "Admin" ? "2" : "3",
     name: role,
-    permissions: role === "Super Admin" ? ["*"] : ["read:pool-session", "create:pool-session", "transfer:pool-session", "delete:pool-session"],
-    description: role === "Super Admin" ? "Full system access" : "Admin access",
+    permissions: role === "Super Admin" ? ["*"] : 
+                role === "Admin" ? ["read:pool-session", "create:pool-session", "transfer:pool-session", "delete:pool-session"] :
+                ["read:pool-session"],
+    description: role === "Super Admin" ? "Full system access" : 
+                role === "Admin" ? "Admin access" : 
+                `${role} user access`,
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z"
   },
@@ -71,7 +75,8 @@ const mockUsers: User[] = [
 ];
 
 const PoolSessions = () => {
-  const [activeTab, setActiveTab] = useState<PoolType>("CRM");
+  const [currentUserRole, setCurrentUserRole] = useState<"Super Admin" | "Admin" | "CRM" | "Blaster" | "Warmup">("Super Admin");
+  
   const [sessions, setSessions] = useState<Session[]>([
     {
       id: "ps1",
@@ -97,8 +102,6 @@ const PoolSessions = () => {
     }
   ]);
   
-  const [currentUserRole, setCurrentUserRole] = useState<"Super Admin" | "Admin">("Admin");
-  
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; sessionId: string | null; isHardDelete: boolean }>({
     open: false, 
     sessionId: null,
@@ -106,6 +109,19 @@ const PoolSessions = () => {
   });
   
   const currentUser = getCurrentUser(currentUserRole);
+  
+  // Get available pools based on user role
+  const getAvailablePools = (): PoolType[] => {
+    if (currentUser.role.name === "Super Admin" || currentUser.role.name === "Admin") {
+      return ["CRM", "BLASTER", "WARMUP"];
+    }
+    // Regular users only see their specific pool
+    return [currentUser.role.name as PoolType];
+  };
+
+  const availablePools = getAvailablePools();
+  const [activeTab, setActiveTab] = useState<PoolType>(availablePools[0] || "CRM");
+  
   const { toast } = useToast();
 
   const canCreateSession = hasPermission(currentUser, "create:pool-session");
@@ -247,6 +263,27 @@ const PoolSessions = () => {
           >
             Admin
           </Button>
+          <Button 
+            variant={currentUserRole === "CRM" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCurrentUserRole("CRM")}
+          >
+            CRM User
+          </Button>
+          <Button 
+            variant={currentUserRole === "Blaster" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCurrentUserRole("Blaster")}
+          >
+            Blaster User
+          </Button>
+          <Button 
+            variant={currentUserRole === "Warmup" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCurrentUserRole("Warmup")}
+          >
+            Warmup User
+          </Button>
           {canCreateSession ? (
             <SessionDialog 
               trigger={
@@ -278,29 +315,35 @@ const PoolSessions = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PoolType)}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="CRM" className="flex items-center space-x-2">
-            <span>CRM</span>
-            <Badge variant="secondary">
-              {poolStats.CRM.filter(s => s.status === "connected").length}/{poolStats.CRM.length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="BLASTER" className="flex items-center space-x-2">
-            <span>Blaster</span>
-            <Badge variant="secondary">
-              {poolStats.BLASTER.filter(s => s.status === "connected").length}/{poolStats.BLASTER.length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="WARMUP" className="flex items-center space-x-2">
-            <span>Warmup</span>
-            <Badge variant="secondary">
-              {poolStats.WARMUP.filter(s => s.status === "connected").length}/{poolStats.WARMUP.length}
-            </Badge>
-          </TabsTrigger>
+        <TabsList className={`grid w-full ${availablePools.length === 3 ? 'grid-cols-3' : availablePools.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {availablePools.includes("CRM") && (
+            <TabsTrigger value="CRM" className="flex items-center space-x-2">
+              <span>CRM</span>
+              <Badge variant="secondary">
+                {poolStats.CRM.filter(s => s.status === "connected").length}/{poolStats.CRM.length}
+              </Badge>
+            </TabsTrigger>
+          )}
+          {availablePools.includes("BLASTER") && (
+            <TabsTrigger value="BLASTER" className="flex items-center space-x-2">
+              <span>Blaster</span>
+              <Badge variant="secondary">
+                {poolStats.BLASTER.filter(s => s.status === "connected").length}/{poolStats.BLASTER.length}
+              </Badge>
+            </TabsTrigger>
+          )}
+          {availablePools.includes("WARMUP") && (
+            <TabsTrigger value="WARMUP" className="flex items-center space-x-2">
+              <span>Warmup</span>
+              <Badge variant="secondary">
+                {poolStats.WARMUP.filter(s => s.status === "connected").length}/{poolStats.WARMUP.length}
+              </Badge>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Tab Content */}
-        {["CRM", "BLASTER", "WARMUP"].map(pool => (
+        {availablePools.map(pool => (
           <TabsContent key={pool} value={pool} className="space-y-4">
             {filteredSessions.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
