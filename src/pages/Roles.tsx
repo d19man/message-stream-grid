@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import {
   Shield,
   Plus,
@@ -18,82 +20,161 @@ import type { Role } from "@/types";
 
 const Roles = () => {
   const { profile } = useAuth();
+  const { toast } = useToast();
   
-  // Mock data
-  const allRoles: Role[] = [
-    {
-      id: "1",
-      name: "Super Admin",
-      permissions: ["*"],
-      description: "Full system access with all permissions",
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: "2024-01-01T00:00:00Z",
-    },
-    {
-      id: "2",
-      name: "Admin",
-      permissions: [
-        "manage:session", "view:session",
-        "view:pool-session", "transfer:pool-session", "delete:pool-session",
-        "manage:broadcast", "view:broadcast", "start:blast", "stop:blast",
-        "manage:template", "view:template",
-        "manage:inbox:crm", "view:inbox:crm",
-        "manage:inbox:blaster", "view:inbox:blaster",
-        "manage:inbox:warmup", "view:inbox:warmup",
-        "manage:user", "view:user"
-      ],
-      description: "System administrator with most permissions (19 permissions)",
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: "2024-01-15T10:00:00Z",
-    },
-    {
-      id: "3",
-      name: "CRM Admin",
-      permissions: [
-        "view:session",
-        "manage:inbox:crm", "view:inbox:crm",
-        "view:template",
-        "view:broadcast",
-        "view:user"
-      ],
-      description: "CRM system administrator with full CRM access",
-      createdAt: "2024-01-05T00:00:00Z",
-      updatedAt: "2024-01-10T15:30:00Z",
-    },
-    {
-      id: "4",
-      name: "Blasting Admin",
-      permissions: [
-        "view:session",
-        "manage:broadcast", "view:broadcast", "start:blast", "stop:blast",
-        "manage:inbox:blaster", "view:inbox:blaster",
-        "manage:template", "view:template",
-        "view:user"
-      ],
-      description: "Blasting system administrator with full blasting access",
-      createdAt: "2024-01-08T00:00:00Z",
-      updatedAt: "2024-01-12T09:20:00Z",
-    },
-    {
-      id: "5",
-      name: "Warmup Admin",
-      permissions: [
-        "view:session",
-        "manage:inbox:warmup", "view:inbox:warmup",
-        "view:template",
-        "view:broadcast",
-        "view:user"
-      ],
-      description: "Warmup system administrator with full warmup access",
-      createdAt: "2024-01-10T00:00:00Z",
-      updatedAt: "2024-01-18T14:45:00Z",
-    },
-  ];
+  // Database state
+  const [roles, setRoles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedRole, setSelectedRole] = useState<any | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedPermissions, setEditedPermissions] = useState<any[]>([]);
 
-  // Filter roles based on user level - hide superadmin from non-superadmin users
-  const roles = profile?.role === "superadmin" 
-    ? allRoles 
-    : allRoles.filter(role => !role.permissions.includes("*"));
+  // Fetch roles from database
+  const fetchRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('roles')
+        .select('*')
+        .order('created_at');
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch roles",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setRoles(data || []);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch roles",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save role permissions
+  const saveRolePermissions = async () => {
+    if (!selectedRole) return;
+
+    try {
+      const { error } = await supabase
+        .from('roles')
+        .update({ 
+          permissions: editedPermissions,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedRole.id);
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to save permissions",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: "Permissions updated successfully!",
+      });
+
+      setIsEditing(false);
+      // Update local state
+      setRoles(prev => prev.map(role => 
+        role.id === selectedRole.id 
+          ? { ...role, permissions: editedPermissions, updated_at: new Date().toISOString() }
+          : role
+      ));
+      setSelectedRole(prev => prev ? { ...prev, permissions: editedPermissions } : null);
+    } catch (error) {
+      console.error('Error saving permissions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save permissions",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Initialize and setup realtime subscription
+  useEffect(() => {
+    fetchRoles();
+
+    // Setup realtime subscription
+    const channel = supabase
+      .channel('roles-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'roles'
+        },
+        (payload) => {
+          console.log('Role updated:', payload);
+          
+          // Update roles list
+          setRoles(prev => prev.map(role => 
+            role.id === payload.new.id ? payload.new : role
+          ));
+
+          // Update selected role if it's the one being changed
+          setSelectedRole(prev => 
+            prev?.id === payload.new.id ? payload.new : prev
+          );
+
+          // Show notification for real-time updates
+          toast({
+            title: "Role Updated",
+            description: `${payload.new.name} permissions have been updated by another user`,
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Handle checkbox changes
+  const handlePermissionChange = (permission: string, checked: boolean) => {
+    if (!isEditing) return;
+
+    setEditedPermissions(prev => {
+      if (checked) {
+        return [...prev, permission];
+      } else {
+        return prev.filter(p => p !== permission);
+      }
+    });
+  };
+
+  // Start editing
+  const startEditing = () => {
+    if (!selectedRole) return;
+    setEditedPermissions(selectedRole.permissions || []);
+    setIsEditing(true);
+  };
+
+  // Cancel editing
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditedPermissions([]);
+  };
+
+  // Filter roles based on user level
+  const filteredRoles = profile?.role === "superadmin" 
+    ? roles 
+    : roles.filter(role => role.name !== 'superadmin');
 
   // All available permissions
   const allPermissions = [
@@ -110,9 +191,8 @@ const Roles = () => {
 
   // Get current user permissions for admin editing
   const getCurrentUserPermissions = () => {
-    if (profile?.role === "superadmin") return ["*"]; // Superadmin has all permissions
+    if (profile?.role === "superadmin") return ["*"];
     if (profile?.role === "admin") {
-      // Return the admin's 19 permissions
       return [
         "manage:session", "view:session",
         "view:pool-session", "transfer:pool-session", "delete:pool-session",
@@ -129,35 +209,47 @@ const Roles = () => {
 
   const currentUserPermissions = getCurrentUserPermissions();
   
-  // Check if current user can edit permissions (admin can only grant permissions they have)
+  // Check if current user can edit permissions
   const canEditPermission = (permission: string) => {
     if (profile?.role === "superadmin") return true;
     return currentUserPermissions.includes(permission);
   };
 
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-
   const getRoleIcon = (roleName: string) => {
-    if (roleName.includes("Super")) return <Crown className="h-5 w-5 text-yellow-500" />;
-    if (roleName.includes("Admin")) return <Shield className="h-5 w-5 text-blue-500" />;
+    if (roleName.includes("superadmin") || roleName.includes("Super")) return <Crown className="h-5 w-5 text-yellow-500" />;
+    if (roleName.includes("admin") || roleName.includes("Admin")) return <Shield className="h-5 w-5 text-blue-500" />;
     return <Users2 className="h-5 w-5 text-gray-500" />;
   };
 
   const getRoleBadgeColor = (roleName: string) => {
-    if (roleName.includes("Super")) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-    if (roleName.includes("Admin")) return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+    if (roleName.includes("superadmin") || roleName.includes("Super")) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+    if (roleName.includes("admin") || roleName.includes("Admin")) return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
     return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
   };
 
-  const hasPermission = (role: Role, permission: string) => {
+  const hasPermission = (role: any, permission: string) => {
+    if (!role?.permissions) return false;
+    if (isEditing && role.id === selectedRole?.id) {
+      return editedPermissions.includes(permission);
+    }
     return role.permissions.includes("*") || role.permissions.includes(permission);
   };
 
-  const getPermissionCount = (role: Role) => {
-    if (role.permissions.includes("*")) return "All";
-    return role.permissions.length;
+  const getPermissionCount = (role: any) => {
+    if (role?.permissions?.includes("*")) return "All";
+    return role?.permissions?.length || 0;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading roles...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -184,7 +276,7 @@ const Roles = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {roles.map((role) => (
+              {filteredRoles.map((role) => (
                 <div
                   key={role.id}
                   className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
@@ -207,20 +299,28 @@ const Roles = () => {
                         </Badge>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      {!role.permissions.includes("*") && (
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
+                     <div className="flex items-center space-x-1">
+                       <Button 
+                         variant="ghost" 
+                         size="sm"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           setSelectedRole(role);
+                           startEditing();
+                         }}
+                       >
+                         <Edit className="h-3 w-3" />
+                       </Button>
+                       {!role.permissions?.includes("*") && (
+                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                           <Trash2 className="h-3 w-3" />
+                         </Button>
+                       )}
+                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">{role.description}</p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Updated: {new Date(role.updatedAt).toLocaleDateString()}
+                    Updated: {new Date(role.updated_at).toLocaleDateString()}
                   </p>
                 </div>
               ))}
@@ -238,14 +338,14 @@ const Roles = () => {
                     {getRoleIcon(selectedRole.name)}
                     <span>{selectedRole.name} Permissions</span>
                   </CardTitle>
-                   <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsEditing(!isEditing)}
-                      className={!(profile?.role === "superadmin" || profile?.role === "admin") ? "hidden" : ""}
-                    >
-                      {isEditing ? "Cancel" : "Edit"}
-                    </Button>
+                    <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => isEditing ? cancelEditing() : startEditing()}
+                       className={!(profile?.role === "superadmin" || profile?.role === "admin") ? "hidden" : ""}
+                     >
+                       {isEditing ? "Cancel" : "Edit"}
+                     </Button>
                 </div>
               </CardHeader>
                <CardContent>
@@ -272,11 +372,12 @@ const Roles = () => {
                           <div className="grid grid-cols-1 gap-2 ml-6">
                             {group.permissions.map((permission) => (
                               <div key={permission} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={permission}
-                                  checked={hasPermission(selectedRole, permission)}
-                                  disabled={!isEditing}
-                                />
+                                 <Checkbox
+                                   id={permission}
+                                   checked={hasPermission(selectedRole, permission)}
+                                   disabled={!isEditing}
+                                   onCheckedChange={(checked) => handlePermissionChange(permission, !!checked)}
+                                 />
                                 <label
                                   htmlFor={permission}
                                   className={`text-sm ${
@@ -298,10 +399,10 @@ const Roles = () => {
                       
                       {isEditing && (
                         <div className="flex space-x-2 pt-4 border-t">
-                          <Button className="bg-gradient-primary hover:opacity-90" size="sm">
+                          <Button className="bg-gradient-primary hover:opacity-90" size="sm" onClick={saveRolePermissions}>
                             Save Changes
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                          <Button variant="outline" size="sm" onClick={cancelEditing}>
                             Cancel
                           </Button>
                         </div>
@@ -323,11 +424,12 @@ const Roles = () => {
                               const canEdit = canEditPermission(permission);
                               return (
                                 <div key={permission} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={permission}
-                                    checked={hasPermission(selectedRole, permission)}
-                                    disabled={!isEditing || !canEdit}
-                                  />
+                                   <Checkbox
+                                     id={permission}
+                                     checked={hasPermission(selectedRole, permission)}
+                                     disabled={!isEditing || !canEdit}
+                                     onCheckedChange={(checked) => handlePermissionChange(permission, !!checked)}
+                                   />
                                   <label
                                     htmlFor={permission}
                                     className={`text-sm ${
@@ -353,10 +455,10 @@ const Roles = () => {
                       
                       {isEditing && (
                         <div className="flex space-x-2 pt-4 border-t">
-                          <Button className="bg-gradient-primary hover:opacity-90" size="sm">
+                          <Button className="bg-gradient-primary hover:opacity-90" size="sm" onClick={saveRolePermissions}>
                             Save Changes
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                          <Button variant="outline" size="sm" onClick={cancelEditing}>
                             Cancel
                           </Button>
                           <p className="text-xs text-muted-foreground mt-2">
