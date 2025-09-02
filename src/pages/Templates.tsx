@@ -383,9 +383,9 @@ const Templates = () => {
                         <div className="text-sm">
                           {(template.kind === "image" || template.kind === "text_image" || template.kind === "image_text_button") && (
                             <div className="mb-2">
-                              {template.content_json.imagePath ? (
+                              {template.content_json.mediaUrl ? (
                                 <img 
-                                  src={template.content_json.imagePath} 
+                                  src={template.content_json.mediaUrl} 
                                   alt="Template preview"
                                   className="w-full h-24 object-cover rounded"
                                 />
@@ -398,11 +398,18 @@ const Templates = () => {
                           )}
                           {template.kind === "audio" && (
                             <div className="mb-2">
-                              <div className="flex items-center space-x-2 p-2 bg-accent rounded">
-                                <Mic className="h-4 w-4 text-primary" />
-                                <div className="flex-1 h-1 bg-primary/30 rounded"></div>
-                                <span className="text-xs">0:15</span>
-                              </div>
+                              {template.content_json.mediaUrl ? (
+                                <audio controls className="w-full h-8">
+                                  <source src={template.content_json.mediaUrl} type="audio/mpeg" />
+                                  Your browser does not support the audio element.
+                                </audio>
+                              ) : (
+                                <div className="flex items-center space-x-2 p-2 bg-accent rounded">
+                                  <Mic className="h-4 w-4 text-primary" />
+                                  <div className="flex-1 h-1 bg-primary/30 rounded"></div>
+                                  <span className="text-xs">Audio</span>
+                                </div>
+                              )}
                             </div>
                           )}
                           <p className="whitespace-pre-wrap">{template.preview}</p>

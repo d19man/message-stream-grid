@@ -259,6 +259,33 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
       return;
     }
 
+    if ((formData.kind === "image" || formData.kind === "text_image" || formData.kind === "image_text_button") && !formData.content_json.mediaUrl) {
+      toast({
+        title: "Error",
+        description: "Please upload an image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.kind === "audio" && !formData.content_json.mediaUrl) {
+      toast({
+        title: "Error",
+        description: "Please upload an audio file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if ((formData.kind === "button" || formData.kind === "text_button" || formData.kind === "image_text_button") && (!formData.content_json.tombolList || formData.content_json.tombolList.length === 0)) {
+      toast({
+        title: "Error",
+        description: "Please add at least one button",
+        variant: "destructive",
+      });
+      return;
+    }
+
     onSave?.(formData);
     setOpen(false);
   };
@@ -435,19 +462,136 @@ export const TemplateDialog = ({ template, trigger, onSave }: TemplateDialogProp
             </div>
           )}
 
-          {/* Image Path */}
+          {/* Image Upload */}
           {(formData.kind === "image" || formData.kind === "text_image" || formData.kind === "image_text_button") && (
             <div>
-              <Label htmlFor="image-path">Image Path</Label>
-              <Input
-                id="image-path"
-                value={formData.content_json.imagePath || ""}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  content_json: { ...prev.content_json, imagePath: e.target.value }
-                }))}
-                placeholder="./uploads/image.png or full URL"
-              />
+              <Label>Image Upload</Label>
+              {formData.content_json.mediaUrl ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Image className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">{formData.content_json.fileName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formData.content_json.fileSize && (formData.content_json.fileSize / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={removeMediaFile}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <img 
+                    src={formData.content_json.mediaUrl} 
+                    alt="Preview" 
+                    className="w-full max-w-xs h-32 object-cover rounded-lg border"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center w-full">
+                    <label
+                      htmlFor="image-upload"
+                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                    >
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
+                        <p className="mb-2 text-sm text-muted-foreground">
+                          <span className="font-semibold">Click to upload</span> an image
+                        </p>
+                        <p className="text-xs text-muted-foreground">PNG, JPG, GIF, WebP (max 5MB)</p>
+                      </div>
+                      <input
+                        id="image-upload"
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => handleFileInputChange(e, 'image')}
+                        disabled={uploading}
+                      />
+                    </label>
+                  </div>
+                  {uploading && (
+                    <div className="flex items-center justify-center py-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                      <span className="text-sm text-muted-foreground">Uploading image...</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Audio Upload */}
+          {formData.kind === "audio" && (
+            <div>
+              <Label>Audio Upload</Label>
+              {formData.content_json.mediaUrl ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Mic className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">{formData.content_json.fileName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formData.content_json.fileSize && (formData.content_json.fileSize / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={removeMediaFile}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <audio controls className="w-full">
+                    <source src={formData.content_json.mediaUrl} type="audio/mpeg" />
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center w-full">
+                    <label
+                      htmlFor="audio-upload"
+                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                    >
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
+                        <p className="mb-2 text-sm text-muted-foreground">
+                          <span className="font-semibold">Click to upload</span> an audio file
+                        </p>
+                        <p className="text-xs text-muted-foreground">MP3, WAV, OGG, M4A (max 10MB)</p>
+                      </div>
+                      <input
+                        id="audio-upload"
+                        type="file"
+                        className="hidden"
+                        accept="audio/*"
+                        onChange={(e) => handleFileInputChange(e, 'audio')}
+                        disabled={uploading}
+                      />
+                    </label>
+                  </div>
+                  {uploading && (
+                    <div className="flex items-center justify-center py-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                      <span className="text-sm text-muted-foreground">Uploading audio...</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
