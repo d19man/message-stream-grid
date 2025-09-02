@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Users2,
@@ -21,12 +22,15 @@ import {
 import { ContactDialog } from "@/components/contacts/ContactDialog";
 import { ImportContactDialog, SYSTEM_TYPES } from "@/components/contacts/ImportContactDialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Contact } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Contact, PoolType } from "@/types";
 
 const Contacts = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedPool, setSelectedPool] = useState<PoolType>("CRM");
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   // Mock data
   const initialContacts: Contact[] = [
@@ -146,11 +150,32 @@ const Contacts = () => {
     }
   };
 
-  // Get all unique tags
-  const allTags = Array.from(new Set(contacts.flatMap(contact => contact.tags)));
+  // Role-based filtering
+  const getAccessibleContacts = () => {
+    if (profile?.role === 'superadmin') {
+      return contacts; // Super admin sees all
+    }
+    // CRM users only see CRM contacts
+    return contacts.filter(contact => contact.system === 'crm');
+  };
+
+  const accessibleContacts = getAccessibleContacts();
+
+  // Pool filtering
+  const poolFilteredContacts = accessibleContacts.filter(contact => {
+    const poolSystemMap: Record<PoolType, string> = {
+      'CRM': 'crm',
+      'BLASTER': 'blaster', 
+      'WARMUP': 'warmup'
+    };
+    return contact.system === poolSystemMap[selectedPool];
+  });
+
+  // Get all unique tags from current pool
+  const allTags = Array.from(new Set(poolFilteredContacts.flatMap(contact => contact.tags)));
 
   // Filter contacts
-  const filteredContacts = contacts.filter(contact => {
+  const filteredContacts = poolFilteredContacts.filter(contact => {
     const matchesSearch = 
       contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.phone.includes(searchQuery);
@@ -161,10 +186,10 @@ const Contacts = () => {
   });
 
   const stats = {
-    total: contacts.length,
-    optedOut: contacts.filter(c => c.optOut).length,
-    tagged: contacts.filter(c => c.tags.length > 0).length,
-    recent: contacts.filter(c => 
+    total: poolFilteredContacts.length,
+    optedOut: poolFilteredContacts.filter(c => c.optOut).length,
+    tagged: poolFilteredContacts.filter(c => c.tags.length > 0).length,
+    recent: poolFilteredContacts.filter(c => 
       c.lastContactAt && 
       new Date(c.lastContactAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     ).length,
@@ -176,16 +201,30 @@ const Contacts = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Contacts</h1>
-          <p className="text-muted-foreground">Manage your contact database</p>
+          <p className="text-muted-foreground">Manage your contact database by category</p>
         </div>
         <div className="flex items-center space-x-4">
           <ImportContactDialog onImport={handleImportContacts} />
           <Button variant="outline" className="flex items-center space-x-2">
             <Download className="h-4 w-4" />
-            <span>Export</span>
+            <span>Export {selectedPool}</span>
           </Button>
           <ContactDialog onSave={handleSaveContact} />
         </div>
+      </div>
+
+      {/* Pool Tabs */}
+      <div className="flex justify-center">
+        <Tabs value={selectedPool} onValueChange={(value) => {
+          setSelectedPool(value as PoolType);
+          setSelectedTag(null); // Reset tag filter when switching pools
+        }} className="w-full max-w-md">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="CRM" className="text-sm">CRM</TabsTrigger>
+            <TabsTrigger value="BLASTER" className="text-sm">BLASTER</TabsTrigger>
+            <TabsTrigger value="WARMUP" className="text-sm">WARMUP</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Stats Cards */}
@@ -248,7 +287,7 @@ const Contacts = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Filter className="h-5 w-5" />
-            <span>Filters</span>
+            <span>Filters - {selectedPool}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -257,7 +296,7 @@ const Contacts = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name or phone..."
+                placeholder={`Search ${selectedPool} contacts...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -292,18 +331,18 @@ const Contacts = () => {
       <Card className="shadow-card">
         <CardHeader>
           <CardTitle>
-            Contacts ({filteredContacts.length})
+            {selectedPool} Contacts ({filteredContacts.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {filteredContacts.length === 0 ? (
             <div className="text-center py-8">
               <Users2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">No contacts found</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-2">No {selectedPool} contacts found</h3>
               <p className="text-muted-foreground">
                 {searchQuery || selectedTag
                   ? "Try adjusting your filters"
-                  : "Import contacts or add them manually to get started"
+                  : `Import ${selectedPool} contacts or add them manually to get started`
                 }
               </p>
             </div>
