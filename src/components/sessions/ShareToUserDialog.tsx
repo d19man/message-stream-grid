@@ -14,6 +14,8 @@ interface ShareToUserDialogProps {
   sessionName: string;
   sessionPool: PoolType;
   onShare?: (userId: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 // Mock users with specific roles
@@ -26,10 +28,14 @@ const mockTeamUsers: (User & { poolRole: PoolType })[] = [
   { id: "user6", email: "frank@example.com", name: "Frank Wilson", roleId: "user", poolRole: "WARMUP", isActive: true, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
 ];
 
-export const ShareToUserDialog = ({ trigger, sessionName, sessionPool, onShare }: ShareToUserDialogProps) => {
-  const [open, setOpen] = useState(false);
+export const ShareToUserDialog = ({ trigger, sessionName, sessionPool, onShare, open: controlledOpen, onOpenChange }: ShareToUserDialogProps) => {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const { toast } = useToast();
+
+  // Use controlled or internal state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
 
   // Filter users by pool role
   const availableUsers = mockTeamUsers.filter(user => user.poolRole === sessionPool);
@@ -74,14 +80,11 @@ export const ShareToUserDialog = ({ trigger, sessionName, sessionPool, onShare }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" size="sm">
-            <Users className="h-4 w-4 mr-2" />
-            Assign to User
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger && (
+        <DialogTrigger asChild>
+          {trigger}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-md" aria-describedby="assign-session-description">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">

@@ -108,6 +108,8 @@ const PoolSessions = () => {
     isHardDelete: false
   });
   
+  const [selectedSessionForAssignment, setSelectedSessionForAssignment] = useState<Session | null>(null);
+  
   const currentUser = getCurrentUser(currentUserRole);
   
   // Get available pools based on user role
@@ -208,6 +210,18 @@ const PoolSessions = () => {
       title: "Distribution Cleared",
       description: `Session "${session.name}" has been cleared and is ready for admin distribution.`
     });
+  };
+
+  const handleAssignToUser = (userId: string) => {
+    if (!selectedSessionForAssignment) return;
+
+    setSessions(prev => prev.map(s => 
+      s.id === selectedSessionForAssignment.id 
+        ? { ...s, userId: userId }
+        : s
+    ));
+
+    setSelectedSessionForAssignment(null);
   };
 
   const getStatusIcon = (status: string) => {
@@ -396,20 +410,14 @@ const PoolSessions = () => {
                             </>
                           )}
                           {currentUser.role.name === "Admin" && (
-                            <DropdownMenuItem asChild>
-                              <div>
-                                <ShareToUserDialog 
-                                  sessionName={session.name}
-                                  sessionPool={session.pool}
-                                  onShare={(userId) => console.log('Assigned to user:', userId)}
-                                  trigger={
-                                    <div className="flex items-center w-full cursor-pointer">
-                                      <ArrowRightLeft className="h-4 w-4 mr-2" />
-                                      Assign to User
-                                    </div>
-                                  }
-                                />
-                              </div>
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                // We'll handle this with a separate state
+                                setSelectedSessionForAssignment(session);
+                              }}
+                            >
+                              <ArrowRightLeft className="h-4 w-4 mr-2" />
+                              Assign to User
                             </DropdownMenuItem>
                           )}
                           {canDeleteSession && (
@@ -482,6 +490,17 @@ const PoolSessions = () => {
           </TabsContent>
         ))}
       </Tabs>
+
+      {/* Assign to User Dialog */}
+      {selectedSessionForAssignment && (
+        <ShareToUserDialog 
+          sessionName={selectedSessionForAssignment.name}
+          sessionPool={selectedSessionForAssignment.pool}
+          onShare={handleAssignToUser}
+          open={true}
+          onOpenChange={(open) => !open && setSelectedSessionForAssignment(null)}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}>
