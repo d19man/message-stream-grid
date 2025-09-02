@@ -5,6 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
   Users2,
   Plus,
   Search,
@@ -17,7 +24,9 @@ import {
   Mail,
   Calendar,
   Send,
-  Activity
+  Activity,
+  ChevronDown,
+  Eye
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
@@ -416,14 +425,63 @@ const Users = () => {
                               {(user.full_name || user.email).charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <div>
-                            <p className="font-medium">{user.full_name || 'No name'}</p>
-                            {isAdmin && adminUserCount > 0 && profile?.role === 'superadmin' && (
-                              <p className="text-xs text-muted-foreground">
-                                {adminUserCount} users under this admin
-                              </p>
-                            )}
-                          </div>
+                         <div>
+                           <p className="font-medium">{user.full_name || 'No name'}</p>
+                           {isAdmin && adminUserCount > 0 && profile?.role === 'superadmin' && (
+                             <DropdownMenu>
+                               <DropdownMenuTrigger className="flex items-center space-x-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                 <span>{adminUserCount} users under this admin</span>
+                                 <ChevronDown className="h-3 w-3" />
+                               </DropdownMenuTrigger>
+                               <DropdownMenuContent 
+                                 align="start" 
+                                 className="w-64 bg-background border shadow-lg z-50"
+                               >
+                                 <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b">
+                                   Users under {user.full_name || user.email}
+                                 </div>
+                                 {users
+                                   .filter(u => u.admin_id === user.id)
+                                   .map((subUser) => (
+                                     <DropdownMenuItem key={subUser.id} className="flex items-center space-x-3 p-3">
+                                       <div className="w-6 h-6 bg-gradient-primary rounded-full flex items-center justify-center">
+                                         <span className="text-xs font-semibold text-primary-foreground">
+                                           {(subUser.full_name || subUser.email).charAt(0).toUpperCase()}
+                                         </span>
+                                       </div>
+                                       <div className="flex-1 min-w-0">
+                                         <p className="text-sm font-medium truncate">
+                                           {subUser.full_name || 'No name'}
+                                         </p>
+                                         <p className="text-xs text-muted-foreground truncate">
+                                           {subUser.email}
+                                         </p>
+                                       </div>
+                                       <div className="flex items-center space-x-1">
+                                         {getRoleIcon(subUser.role)}
+                                         <Badge 
+                                           variant="secondary" 
+                                           className={`text-xs ${getRoleBadgeColor(subUser.role)}`}
+                                         >
+                                           {subUser.role}
+                                         </Badge>
+                                       </div>
+                                     </DropdownMenuItem>
+                                   ))
+                                 }
+                                 {users.filter(u => u.admin_id === user.id).length >= 3 && (
+                                   <>
+                                     <DropdownMenuSeparator />
+                                     <DropdownMenuItem className="text-center text-xs text-muted-foreground">
+                                       <Eye className="h-3 w-3 mr-1" />
+                                       View all users
+                                     </DropdownMenuItem>
+                                   </>
+                                 )}
+                               </DropdownMenuContent>
+                             </DropdownMenu>
+                           )}
+                         </div>
                         </div>
                       </TableCell>
                     <TableCell>
