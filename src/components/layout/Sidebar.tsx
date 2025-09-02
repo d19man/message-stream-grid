@@ -1,4 +1,5 @@
 import { useState } from "react";
+import React from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -67,12 +69,6 @@ const Sidebar = () => {
   const [billingDialogOpen, setBillingDialogOpen] = useState(false);
   const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: "John Smith",
-    email: "john@whatsappsuite.com",
-    phone: "+1 234 567 8900",
-    company: "WhatsApp Suite Ltd",
-  });
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
     pushNotifications: true,
@@ -80,7 +76,26 @@ const Sidebar = () => {
     marketingEmails: false,
   });
   const { toast } = useToast();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
+
+  // Use real profile data instead of hardcoded dummy data
+  const [profileData, setProfileData] = useState({
+    name: profile?.full_name || "",
+    email: profile?.email || "",
+    phone: "+1 234 567 8900", // This can remain as placeholder since it's not in auth
+    company: "WhatsApp Suite Ltd", // This can remain as placeholder
+  });
+
+  // Update profile data when auth profile changes
+  React.useEffect(() => {
+    if (profile) {
+      setProfileData(prev => ({
+        ...prev,
+        name: profile.full_name || "",
+        email: profile.email || ""
+      }));
+    }
+  }, [profile]);
 
   const handleThemeToggle = () => {
     const newTheme = !darkMode;
@@ -100,12 +115,40 @@ const Sidebar = () => {
     });
   };
 
-  const handleProfileSave = () => {
-    toast({
-      title: "Profile Updated",
-      description: "Your profile information has been saved successfully",
-    });
-    setProfileDialogOpen(false);
+  const handleProfileSave = async () => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profileData.name.trim()
+          // Email is not updated as it's tied to authentication
+        })
+        .eq('id', profile?.id);
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: `Failed to update profile: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Profile Updated", 
+        description: "Your profile information has been saved successfully",
+      });
+      setProfileDialogOpen(false);
+      
+      // Refresh the page to show updated data
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: `Unexpected error: ${err.message}`,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleNotificationSave = () => {
@@ -199,14 +242,22 @@ const Sidebar = () => {
             >
               <div className={cn("flex items-center", collapsed ? "justify-center" : "space-x-3 w-full")}>
                 <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-semibold text-primary-foreground">JS</span>
+                  <span className="text-xs font-semibold text-primary-foreground">
+                    {(profile?.full_name || profile?.email || "U").charAt(0).toUpperCase()}
+                  </span>
                 </div>
                 {!collapsed && (
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-sm font-medium text-sidebar-foreground truncate">John Smith</p>
+                    <p className="text-sm font-medium text-sidebar-foreground truncate">
+                      {profile?.full_name || "Loading..."}
+                    </p>
                     <div className="flex items-center space-x-2">
-                      <p className="text-xs text-sidebar-foreground/60 truncate">Admin</p>
-                      <Badge variant="secondary" className="text-xs px-1.5 py-0">Pro</Badge>
+                      <p className="text-xs text-sidebar-foreground/60 truncate capitalize">
+                        {profile?.role || "User"}
+                      </p>
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                        {profile?.role === 'superadmin' ? 'Super Admin' : 'Pro'}
+                      </Badge>
                     </div>
                   </div>
                 )}
@@ -222,11 +273,13 @@ const Sidebar = () => {
             <DropdownMenuLabel>
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-                  <span className="text-sm font-semibold text-primary-foreground">JS</span>
+                  <span className="text-sm font-semibold text-primary-foreground">
+                    {(profile?.full_name || profile?.email || "U").charAt(0).toUpperCase()}
+                  </span>
                 </div>
                 <div>
-                  <p className="font-medium">John Smith</p>
-                  <p className="text-xs text-muted-foreground">john@whatsappsuite.com</p>
+                  <p className="font-medium">{profile?.full_name || "Loading..."}</p>
+                  <p className="text-xs text-muted-foreground">{profile?.email || "Loading..."}</p>
                 </div>
               </div>
             </DropdownMenuLabel>
@@ -312,8 +365,12 @@ const Sidebar = () => {
                   id="email"
                   type="email"
                   value={profileData.email}
-                  onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                  disabled={true}
+                  className="bg-muted"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Email cannot be changed as it's linked to your authentication
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
