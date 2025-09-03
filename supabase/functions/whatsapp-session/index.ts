@@ -124,12 +124,13 @@ serve(async (req) => {
               });
 
               if (qr) {
-                console.log(`Real QR code generated for session ${sessionId}`);
+                console.log(`REAL WhatsApp QR code generated for session ${sessionId}:`);
+                console.log(`QR length: ${qr.length}, starts with: ${qr.substring(0, 50)}...`);
                 
                 // Store the REAL WhatsApp QR code from Baileys
                 qrCodes.set(sessionId, qr);
                 
-                // Update database with REAL QR code
+                // Update database with REAL QR code (store the raw QR string, not converted to image)
                 await supabase
                   .from('whatsapp_sessions')
                   .upsert({
@@ -149,7 +150,7 @@ serve(async (req) => {
                   })
                   .eq('id', sessionId);
 
-                console.log(`Real WhatsApp QR code stored for session ${sessionId}`);
+                console.log(`REAL WhatsApp QR code stored in database for session ${sessionId}`);
               }
 
               if (connection === 'close') {
