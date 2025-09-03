@@ -237,8 +237,8 @@ export const useSessions = () => {
     try {
       // Get session name from database first
       const { data: sessionData, error: sessionError } = await supabase
-        .from('wa_sessions')
-        .select('name')
+        .from('whatsapp_sessions')
+        .select('session_name')
         .eq('id', sessionId)
         .single();
 
@@ -246,15 +246,17 @@ export const useSessions = () => {
 
       // Call Express server API
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/wa/${sessionData.name}/sendText`, {
+      const response = await fetch(`${API_URL}/api/whatsapp/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
         },
         body: JSON.stringify({
-          jid: to,
-          text: message
+          sessionId,
+          to,
+          message,
+          messageType
         })
       });
 

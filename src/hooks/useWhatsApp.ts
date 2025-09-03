@@ -253,11 +253,11 @@ export const useWhatsApp = () => {
     }
   };
 
-  // Setup real-time subscriptions using Express Socket.io
+  // Setup real-time subscriptions - ONLY use Socket.io, remove Supabase realtime to prevent conflicts
   useEffect(() => {
     fetchSessions();
 
-    // Connect to Express server Socket.io
+    // Connect to Express server Socket.io ONLY - no more dual subscriptions
     const socket = socketClient.connect();
     
     // Listen for QR codes from Express server
@@ -288,42 +288,12 @@ export const useWhatsApp = () => {
       }));
     });
 
-    // Keep Supabase subscriptions for database changes
-    const sessionChannel = supabase
-      .channel('whatsapp-sessions-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'whatsapp_sessions'
-        },
-        (payload) => {
-          console.log('Session change:', payload);
-          fetchSessions();
-        }
-      )
-      .subscribe();
-
-    const messageChannel = supabase
-      .channel('whatsapp-messages-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'whatsapp_messages'
-        },
-        (payload) => {
-          console.log('Message change:', payload);
-        }
-      )
-      .subscribe();
+    // REMOVED: Dual Supabase subscriptions that caused conflicts
+    // Only use Socket.io for real-time updates to prevent race conditions
 
     return () => {
       socketClient.disconnect();
-      supabase.removeChannel(sessionChannel);
-      supabase.removeChannel(messageChannel);
+      // No more Supabase channel cleanup needed
     };
   }, []);
 

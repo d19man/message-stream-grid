@@ -256,7 +256,6 @@ async function createWhatsAppSession(sessionId, sessionName) {
             })
             .eq('id', sessionId);
         }
-        
         console.log('📤 Broadcasting disconnect status for session:', sessionId);
         io.emit('wa:status', { session: sessionId, status: 'disconnected' });
         io.to(`session_${sessionId}`).emit('wa:status', { session: sessionId, status: 'disconnected' });
@@ -271,7 +270,8 @@ async function createWhatsAppSession(sessionId, sessionName) {
           .update({ 
             status: 'connected',
             phone_number: phoneNumber,
-            qr_code: null
+            qr_code: null,
+            last_seen: new Date().toISOString()
           })
           .eq('id', sessionId);
 
