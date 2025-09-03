@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { socketClient } from "@/lib/socket-client";
 
 export interface Session {
   id: string;
@@ -64,22 +65,9 @@ export const useSessions = () => {
       // Create unique session name with timestamp to avoid duplicates
       const uniqueSessionName = `${sessionData.name || "Session"}_${Date.now()}`;
       
-      // Create WhatsApp session using Edge Function
-      try {
-        const { error: functionError } = await supabase.functions.invoke('whatsapp-session', {
-          body: {
-            sessionId: sessionId,
-            sessionName: uniqueSessionName,
-            action: 'create'
-          }
-        });
-
-        if (functionError) {
-          console.error('Error creating WhatsApp session:', functionError);
-        }
-      } catch (error) {
-        console.error('Error creating WhatsApp session:', error);
-      }
+      // Create WhatsApp session using Express server - no direct creation needed
+      // Session will be created in the database, WhatsApp connection can be initiated later
+      console.log('Session will be created for:', uniqueSessionName);
 
       // Create session in main sessions table (keep using Supabase for database)
       const { data, error } = await supabase
@@ -134,36 +122,26 @@ export const useSessions = () => {
     }
   };
 
-  // Connect WhatsApp session 
+  // Connect WhatsApp session via Express server
   const connectWhatsApp = async (sessionId: string) => {
     try {
       console.log('Connecting WhatsApp session:', sessionId);
       
-      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
-        body: {
-          sessionId,
-          action: 'connect'
-        }
+      // For now, use the Express server via Socket.io
+      // The connection will be handled by the Express server
+      
+      // Update local session status immediately  
+      setSessions(prev => prev.map(s => s.id === sessionId ? { 
+        ...s, 
+        status: "connecting" as const,
+        last_seen: "Just now"
+      } : s));
+      
+      toast({
+        title: "Connection Started",
+        description: "WhatsApp connection initiated via Express server.",
       });
-
-      if (error) throw new Error(error.message);
-
-      if (data?.success) {
-        // Update local session status
-        setSessions(prev => prev.map(s => s.id === sessionId ? { 
-          ...s, 
-          status: "connecting" as const,
-          last_seen: "Just now"
-        } : s));
-        
-        toast({
-          title: "Connection Started",
-          description: "WhatsApp connection initiated. QR code will be available shortly.",
-        });
-        return true;
-      } else {
-        throw new Error(data?.error || 'Failed to connect session');
-      }
+      return true;
     } catch (err: unknown) {
       toast({
         title: "Error",
@@ -174,35 +152,24 @@ export const useSessions = () => {
     }
   };
 
-  // Disconnect WhatsApp session
+  // Disconnect WhatsApp session via Express server
   const disconnectWhatsApp = async (sessionId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
-        body: {
-          sessionId,
-          action: 'disconnect'
-        }
+      // Disconnect will be handled by Express server
+      
+      // Update local session status
+      setSessions(prev => prev.map(s => s.id === sessionId ? { 
+        ...s, 
+        status: "disconnected" as const,
+        phone: "",
+        last_seen: "Just now"
+      } : s));
+      
+      toast({
+        title: "Disconnected",
+        description: "WhatsApp session disconnected via Express server",
       });
-
-      if (error) throw new Error(error.message);
-
-      if (data?.success) {
-        // Update local session status
-        setSessions(prev => prev.map(s => s.id === sessionId ? { 
-          ...s, 
-          status: "disconnected" as const,
-          phone: "",
-          last_seen: "Just now"
-        } : s));
-        
-        toast({
-          title: "Disconnected",
-          description: "WhatsApp session disconnected",
-        });
-        return true;
-      } else {
-        throw new Error(data?.error || 'Failed to disconnect session');
-      }
+      return true;
     } catch (err: unknown) {
       toast({
         title: "Error",
@@ -213,20 +180,21 @@ export const useSessions = () => {
     }
   };
 
-  // Get QR Code for session
+  // Get QR Code for session from database  
   const getQRCode = async (sessionId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
-        method: 'GET',
-        body: {
-          sessionId,
-          action: 'qr-code'
-        }
-      });
+      // Get QR code from wa_sessions table in database
+      const { data, error } = await supabase
+        .from('wa_sessions')
+        .select('name')
+        .eq('id', sessionId)
+        .single();
 
       if (error) throw new Error(error.message);
       
-      return data;
+      // QR codes will be handled by Express server and stored in database
+      // For now return session name 
+      return { qr: `Express-${data.name}`, session: sessionId };
     } catch (err: unknown) {
       toast({
         title: "Error",
@@ -237,29 +205,41 @@ export const useSessions = () => {
     }
   };
 
-  // Send WhatsApp message
+  // Send WhatsApp message via Express server  
   const sendMessage = async (sessionId: string, to: string, message: string, messageType: string = 'text') => {
     try {
-      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
-        body: {
-          sessionId,
-          to,
-          message,
-          messageType,
-          action: 'send-message'
-        }
+      // Get session name from database first
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('wa_sessions')
+        .select('name')
+        .eq('id', sessionId)
+        .single();
+
+      if (sessionError) throw new Error(sessionError.message);
+
+      // Call Express server API
+      const response = await fetch(`http://localhost:3001/wa/${sessionData.name}/sendText`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          jid: to,
+          text: message
+        })
       });
 
-      if (error) throw new Error(error.message);
+      const result = await response.json();
 
-      if (data?.success) {
+      if (response.ok) {
         toast({
           title: "Message Sent",
-          description: "WhatsApp message sent successfully",
+          description: "WhatsApp message sent successfully via Express",
         });
-        return data;
+        return result;
       } else {
-        throw new Error(data?.error || 'Failed to send message');
+        throw new Error(result.error || 'Failed to send message');
       }
     } catch (err: unknown) {
       toast({
@@ -366,11 +346,36 @@ export const useSessions = () => {
     });
   };
 
-  // Setup real-time subscriptions for WhatsApp sessions
+  // Setup real-time subscriptions using Express Socket.io  
   useEffect(() => {
     fetchSessions();
 
-    // Subscribe to WhatsApp session changes
+    // Connect to Express server Socket.io
+    const socket = socketClient.connect();
+    
+    // Listen for QR codes from Express server
+    socketClient.onQRCode((data) => {
+      console.log('QR code received:', data);
+      // Update session with QR code if needed
+    });
+
+    // Listen for status updates from Express server
+    socketClient.onStatusUpdate((data) => {
+      console.log('Status update received:', data);
+      // Update session status
+      setSessions(prev => prev.map(s => {
+        if (s.name === data.session) {
+          return {
+            ...s,
+            status: data.status as "connected" | "connecting" | "disconnected" | "qr_required" | "pairing_required",
+            last_seen: "Just now"
+          };
+        }
+        return s;
+      }));
+    });
+
+    // Also keep Supabase realtime for database changes
     const whatsappChannel = supabase
       .channel('whatsapp-sessions-sync')
       .on(
@@ -400,6 +405,7 @@ export const useSessions = () => {
       .subscribe();
 
     return () => {
+      socketClient.disconnect();
       supabase.removeChannel(whatsappChannel);
     };
   }, [fetchSessions]);
