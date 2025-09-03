@@ -26,7 +26,8 @@ serve(async (req) => {
     let action;
     
     if (req.method === 'POST') {
-      const { sessionId, sessionName, phoneNumber, action: bodyAction } = await req.json();
+      const requestBody = await req.json();
+      const { sessionId, sessionName, phoneNumber, action: bodyAction, to, message, messageType } = requestBody;
       action = bodyAction;
       console.log(`WhatsApp session action: ${action}`, { sessionId, sessionName, phoneNumber });
 
@@ -75,15 +76,16 @@ serve(async (req) => {
           const qrData = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=whatsapp://connect/${sessionId}/${Date.now()}`;
           qrCodes.set(sessionId, qrData);
 
-          // Update database
+          // Update database with QR code
           await supabase
             .from('whatsapp_sessions')
-            .update({
+            .upsert({
+              id: sessionId,
+              session_name: sessionId,
               status: 'qr_ready',
               qr_code: qrData,
               last_seen: new Date().toISOString()
-            })
-            .eq('id', sessionId);
+            });
 
           // Also update main sessions table
           await supabase
@@ -180,8 +182,7 @@ serve(async (req) => {
         }
 
         case 'send-message': {
-          // Send WhatsApp message
-          const { to, message, messageType = 'text' } = await req.json();
+          // Send WhatsApp message - use already parsed data
           console.log(`Sending message from session ${sessionId} to ${to}: ${message}`);
 
           const session = sessions.get(sessionId);
@@ -189,7 +190,7 @@ serve(async (req) => {
             throw new Error('Session not connected');
           }
 
-          // Store message in database
+           // Store message in database
           await supabase
             .from('whatsapp_messages')
             .insert({
@@ -197,7 +198,7 @@ serve(async (req) => {
               from_number: session.phone || 'unknown',
               to_number: to,
               message_text: message,
-              message_type: messageType,
+              message_type: messageType || 'text',
               timestamp: new Date().toISOString(),
               is_from_me: true,
               status: 'sent'
@@ -222,7 +223,14 @@ serve(async (req) => {
       action = url.searchParams.get('action');
       
       if (action === 'qr-code' && sessionId) {
-        const qrCode = qrCodes.get(sessionId);
+        // Get QR code from database instead of memory
+        const { data: sessionData } = await supabase
+          .from('whatsapp_sessions')
+          .select('qr_code')
+          .eq('id', sessionId)
+          .single();
+        
+        const qrCode = sessionData?.qr_code;
         
         return new Response(JSON.stringify({
           success: !!qrCode,
