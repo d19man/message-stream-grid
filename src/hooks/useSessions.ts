@@ -180,25 +180,17 @@ export const useSessions = () => {
     }
   };
 
-  // Get QR Code for session from database  
+  // Get QR Code from Express server directly
   const getQRCode = async (sessionId: string) => {
     try {
-      // Get QR code from wa_sessions table in database
-      const { data, error } = await supabase
-        .from('wa_sessions')
-        .select('name')
-        .eq('id', sessionId)
-        .single();
-
-      if (error) throw new Error(error.message);
-      
-      // QR codes will be handled by Express server and stored in database
-      // For now return session name 
-      return { qr: `Express-${data.name}`, session: sessionId };
+      // For now, return null as QR will be handled by Express server real-time
+      // Express server will emit QR via Socket.io when available
+      console.log('QR Code will be provided by Express server via Socket.io for session:', sessionId);
+      return null;
     } catch (err: unknown) {
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : "Failed to get QR code",
+        description: err instanceof Error ? err.message : "QR code will be provided by Express server",
         variant: "destructive",
       });
       return null;

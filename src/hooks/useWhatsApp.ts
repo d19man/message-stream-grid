@@ -151,25 +151,20 @@ export const useWhatsApp = () => {
     }
   };
 
-  // Get QR code from database
+  // Get QR code from Express server directly  
   const getQRCode = async (sessionId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('whatsapp_sessions')
-        .select('qr_code, session_name')
-        .eq('id', sessionId)
-        .single();
-
-      if (error) throw new Error(error.message);
-
-      return { qr: data.qr_code, session: data.session_name };
+      // QR codes will be handled by Express server and emitted via Socket.io
+      // Return null for now as QR will come through real-time socket connection
+      console.log('QR Code will be provided by Express server via Socket.io for session:', sessionId);
+      return null;
     } catch (err: any) {
       toast({
         title: "Error",
-        description: err.message,
+        description: "QR code will be provided by Express server via Socket.io",
         variant: "destructive",
       });
-      throw err;
+      return null;
     }
   };
 
