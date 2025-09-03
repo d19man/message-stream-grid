@@ -53,11 +53,11 @@ export const PairingDialog = ({ sessionName, sessionId, trigger }: PairingDialog
       } else {
         throw new Error(data?.error || 'Failed to generate pairing code');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error requesting pairing code:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to request pairing code",
+        description: error instanceof Error ? error.message : "Failed to request pairing code",
         variant: "destructive"
       });
     } finally {

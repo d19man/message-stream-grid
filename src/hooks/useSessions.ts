@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -21,7 +21,7 @@ export const useSessions = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -54,7 +54,7 @@ export const useSessions = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const createSession = async (sessionData: Partial<Session>): Promise<Session | null> => {
     try {
@@ -160,10 +160,10 @@ export const useSessions = () => {
       } else {
         throw new Error(data?.error || 'Failed to connect session');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: "Error",
-        description: err.message,
+        description: err instanceof Error ? err.message : "Failed to connect session",
         variant: "destructive",
       });
       return false;
@@ -199,10 +199,10 @@ export const useSessions = () => {
       } else {
         throw new Error(data?.error || 'Failed to disconnect session');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: "Error",
-        description: err.message,
+        description: err instanceof Error ? err.message : "Failed to disconnect session",
         variant: "destructive",
       });
       return false;
@@ -223,10 +223,10 @@ export const useSessions = () => {
       if (error) throw new Error(error.message);
       
       return data;
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: "Error",
-        description: err.message,
+        description: err instanceof Error ? err.message : "Failed to get QR code",
         variant: "destructive",
       });
       return null;
@@ -257,10 +257,10 @@ export const useSessions = () => {
       } else {
         throw new Error(data?.error || 'Failed to send message');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: "Error",
-        description: err.message,
+        description: err instanceof Error ? err.message : "Failed to send message",
         variant: "destructive",
       });
       return null;
@@ -398,7 +398,7 @@ export const useSessions = () => {
     return () => {
       supabase.removeChannel(whatsappChannel);
     };
-  }, []);
+  }, [fetchSessions]);
 
   return {
     sessions,

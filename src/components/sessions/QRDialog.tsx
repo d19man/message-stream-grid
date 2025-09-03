@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { QrCode, RefreshCw, Loader2 } from "lucide-react";
@@ -17,7 +17,7 @@ export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => 
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchQRCode = async () => {
+  const fetchQRCode = useCallback(async () => {
     if (!sessionId) return;
     
     try {
@@ -61,13 +61,13 @@ export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => 
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId, toast]);
 
   useEffect(() => {
     if (open && sessionId) {
       fetchQRCode();
     }
-  }, [open, sessionId]);
+  }, [open, sessionId, fetchQRCode]);
 
   const refreshQR = () => {
     fetchQRCode();
