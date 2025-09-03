@@ -23,15 +23,20 @@ export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => 
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.functions.invoke('whatsapp-session', {
+      // For GET requests with query parameters, construct URL manually
+      const response = await fetch(`https://fkviagopdmfytphpwtha.supabase.co/functions/v1/whatsapp-session?sessionId=${sessionId}&action=qr-code`, {
         method: 'GET',
-        body: {
-          sessionId,
-          action: 'qr-code'
-        }
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (error) throw new Error(error.message);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
 
       if (data?.success && data?.qrCode) {
         setQrCode(data.qrCode);
