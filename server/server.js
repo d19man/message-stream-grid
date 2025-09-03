@@ -1,26 +1,23 @@
 const express = require('express');
-const { createServer } = require('http');
-const { Server } = require('socket.io');
+const http = require('http');
+const socketIo = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
+const makeWASocket = require('@whiskeysockets/baileys').default;
+const { DisconnectReason, useMultiFileAuthState, makeInMemoryStore } = require('@whiskeysockets/baileys');
+const QRCode = require('qrcode');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-const { createClient } = require('@supabase/supabase-js');
-const makeWASocket = require('@whiskeysockets/baileys').default;
-const { DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const QRCode = require('qrcode');
-
 const app = express();
-const server = createServer(app);
-const io = new Server(server, {
+const server = http.createServer(app);
+const io = socketIo(server, {
   cors: {
     origin: process.env.CORS_ORIGIN || "http://localhost:5173",
     methods: ["GET", "POST"]
   }
 });
-
-const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
@@ -34,11 +31,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Store active WhatsApp sessions
+// Storage for active sessions
 const activeSessions = new Map();
 const sessionQRCodes = new Map();
 
-// Auth middleware
+// Create sessions directory if it doesn't exist
+const sessionsDir = path.join(__dirname, 'sessions');
+if (!fs.existsSync(sessionsDir)) {
+  fs.mkdirSync(sessionsDir, { recursive: true });
+}
+
+// Middleware to verify authentication
 const verifyAuth = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -59,237 +62,66 @@ const verifyAuth = async (req, res, next) => {
   }
 };
 
-// Routes
-app.get('/health', async (req, res) => {
-  try {
-    // Check Supabase connection
-    const { data, error } = await supabase.from('sessions').select('count').limit(1);
-    
-    res.json({ 
-      ok: true, 
-      timestamp: new Date().toISOString(),
-      backend: 'Express + Baileys + Supabase + Socket.io',
-      supabase: error ? 'Error' : 'Connected',
-      whatsapp: 'Baileys Ready',
-      activeSessions: activeSessions.size,
-      socketConnections: io.engine.clientsCount
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      ok: false, 
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    activeSessions: activeSessions.size,
+    supabaseConnected: !!supabase
+  });
 });
-
-// WhatsApp helper function
-const createWhatsAppSession = async (sessionId, sessionName) => {
-  console.log(`Creating WhatsApp session: ${sessionName} with ID: ${sessionId}`);
-  
-  // Create auth directory
-  const authDir = path.join(__dirname, 'sessions', sessionId);
-  if (!fs.existsSync(authDir)) {
-    fs.mkdirSync(authDir, { recursive: true });
-  }
-
-  try {
-    // Create Baileys socket
-    const { state, saveCreds } = await useMultiFileAuthState(authDir);
-    
-    const sock = makeWASocket({
-      auth: state,
-      printQRInTerminal: false,
-      logger: { level: 'silent' },
-      browser: ['WhatsApp Business', 'Chrome', '4.0.0'],
-    });
-
-    // Store session
-    activeSessions.set(sessionId, sock);
-
-    // Handle connection updates
-    sock.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect, qr } = update;
-      
-      console.log(`Connection update for ${sessionId}:`, { connection, qr: !!qr });
-      
-      if (qr) {
-        try {
-          // Generate QR code as base64 data URL
-          const qrImage = await QRCode.toDataURL(qr, {
-            width: 256,
-            margin: 2
-          });
-          
-          // Store QR code
-          sessionQRCodes.set(sessionId, qrImage);
-          
-          // Emit QR code via Socket.io
-          io.emit('qr', { 
-            session: sessionId, 
-            sessionName: sessionName,
-            qr: qrImage 
-          });
-          
-          // Update database
-          await supabase
-            .from('sessions')
-            .update({ 
-              status: 'qr_required',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', sessionId);
-            
-          // Emit status update
-          io.emit('wa:status', { 
-            session: sessionId, 
-            status: 'qr_required',
-            sessionName: sessionName
-          });
-        } catch (error) {
-          console.error('Error generating QR code:', error);
-        }
-      }
-      
-      if (connection === 'close') {
-        const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-        console.log('Connection closed, reconnecting:', shouldReconnect);
-        
-        // Update database
-        await supabase
-          .from('sessions')
-          .update({ 
-            status: 'disconnected',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', sessionId);
-          
-        // Emit status update
-        io.emit('wa:status', { 
-          session: sessionId, 
-          status: 'disconnected',
-          sessionName: sessionName
-        });
-          
-        // Clean up
-        activeSessions.delete(sessionId);
-        sessionQRCodes.delete(sessionId);
-        
-        if (shouldReconnect) {
-          console.log(`Auto-reconnecting session ${sessionId} in 5 seconds...`);
-          setTimeout(() => {
-            createWhatsAppSession(sessionId, sessionName);
-          }, 5000);
-        }
-      } else if (connection === 'open') {
-        console.log(`WhatsApp session ${sessionId} connected successfully`);
-        
-        // Get phone number
-        const phoneNumber = sock.user?.id?.split(':')[0] || '';
-        
-        // Update database
-        await supabase
-          .from('sessions')
-          .update({ 
-            status: 'connected',
-            phone: phoneNumber,
-            last_seen: new Date().toLocaleString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', sessionId);
-          
-        // Emit status update
-        io.emit('wa:status', { 
-          session: sessionId, 
-          status: 'connected',
-          phone: phoneNumber,
-          sessionName: sessionName
-        });
-          
-        // Remove QR code
-        sessionQRCodes.delete(sessionId);
-      }
-    });
-
-    // Handle credentials update
-    sock.ev.on('creds.update', saveCreds);
-
-    // Handle incoming messages
-    sock.ev.on('messages.upsert', async (m) => {
-      const messages = m.messages;
-      
-      for (const message of messages) {
-        if (message.key && message.message && !message.key.fromMe) {
-          console.log('New message received:', message.key.id);
-          
-          // Emit new message via Socket.io
-          io.emit('wa:message', {
-            sessionId: sessionId,
-            messageId: message.key.id,
-            from: message.key.remoteJid,
-            timestamp: message.messageTimestamp,
-            text: message.message?.conversation || message.message?.extendedTextMessage?.text || 'Media message'
-          });
-        }
-      }
-    });
-
-    return sock;
-  } catch (error) {
-    console.error('Error creating WhatsApp session:', error);
-    throw error;
-  }
-};
 
 // API Routes
 app.post('/api/whatsapp/create', verifyAuth, async (req, res) => {
   try {
-    const { sessionName, sessionId } = req.body;
+    const { sessionName } = req.body;
     
-    if (!sessionName || !sessionId) {
-      return res.status(400).json({ error: 'sessionName and sessionId are required' });
-    }
-    
-    console.log(`Creating session: ${sessionName} (${sessionId})`);
-    
-    res.json({ 
-      success: true, 
-      message: 'Session created successfully',
-      sessionId 
-    });
+    // Create session in database
+    const { data, error } = await supabase
+      .from('whatsapp_sessions')
+      .insert([{
+        name: sessionName,
+        status: 'disconnected',
+        created_by: req.user.id
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ success: true, session: data });
   } catch (error) {
-    console.error('Error creating session:', error);
+    console.error('Create session error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 app.post('/api/whatsapp/connect', verifyAuth, async (req, res) => {
   try {
-    const { sessionId, sessionName } = req.body;
+    const { sessionId } = req.body;
     
-    if (!sessionId) {
-      return res.status(400).json({ error: 'sessionId is required' });
-    }
-    
-    // Check if session already exists
     if (activeSessions.has(sessionId)) {
-      return res.json({ 
-        success: true, 
-        message: 'Session already connected',
-        sessionId 
-      });
+      return res.json({ success: true, message: 'Session already connected' });
     }
-    
-    // Create WhatsApp session
-    await createWhatsAppSession(sessionId, sessionName || sessionId);
 
-    res.json({ 
-      success: true, 
-      message: 'Session connection initiated',
-      sessionId 
-    });
+    // Get session from database
+    const { data: session, error } = await supabase
+      .from('whatsapp_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+
+    if (error || !session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Create WhatsApp connection
+    await createWhatsAppSession(sessionId, session.name);
+    
+    res.json({ success: true, message: 'Connection initiated' });
   } catch (error) {
-    console.error('Error connecting session:', error);
+    console.error('Connect session error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -298,35 +130,27 @@ app.post('/api/whatsapp/disconnect', verifyAuth, async (req, res) => {
   try {
     const { sessionId } = req.body;
     
-    const sock = activeSessions.get(sessionId);
-    if (sock) {
-      sock.end();
+    const socket = activeSessions.get(sessionId);
+    if (socket) {
+      await socket.logout();
+      socket.end();
       activeSessions.delete(sessionId);
+      sessionQRCodes.delete(sessionId);
     }
-    
-    sessionQRCodes.delete(sessionId);
-    
+
     // Update database
     await supabase
-      .from('sessions')
+      .from('whatsapp_sessions')
       .update({ 
         status: 'disconnected',
-        updated_at: new Date().toISOString()
+        phone_number: null,
+        qr_code: null
       })
       .eq('id', sessionId);
-    
-    // Emit status update
-    io.emit('wa:status', { 
-      session: sessionId, 
-      status: 'disconnected'
-    });
-    
-    res.json({ 
-      success: true, 
-      message: 'Session disconnected successfully' 
-    });
+
+    res.json({ success: true, message: 'Session disconnected' });
   } catch (error) {
-    console.error('Error disconnecting session:', error);
+    console.error('Disconnect session error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -335,58 +159,193 @@ app.post('/api/whatsapp/send', verifyAuth, async (req, res) => {
   try {
     const { sessionId, to, message, messageType = 'text' } = req.body;
     
-    const sock = activeSessions.get(sessionId);
-    if (!sock) {
-      return res.status(404).json({ error: 'Session not found or not connected' });
+    const socket = activeSessions.get(sessionId);
+    if (!socket) {
+      return res.status(400).json({ error: 'Session not connected' });
     }
+
+    const result = await socket.sendMessage(to, { text: message });
     
-    // Format number untuk WhatsApp
-    const jid = to.includes('@') ? to : `${to.replace(/\D/g, '')}@s.whatsapp.net`;
-    
-    const result = await sock.sendMessage(jid, { text: message });
-    
-    console.log('Message sent successfully:', result.key.id);
-    
-    res.json({ 
-      success: true, 
-      messageId: result.key.id,
-      message: 'Message sent successfully'
-    });
+    // Store message in database
+    await supabase
+      .from('whatsapp_messages')
+      .insert([{
+        session_id: sessionId,
+        from_number: socket.user?.id || 'unknown',
+        to_number: to,
+        message_content: message,
+        message_type: messageType,
+        status: 'sent',
+        direction: 'outbound'
+      }]);
+
+    res.json({ success: true, result });
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('Send message error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
+// WhatsApp Session Management
+async function createWhatsAppSession(sessionId, sessionName) {
+  try {
+    const sessionPath = path.join(sessionsDir, sessionName);
+    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+    
+    const socket = makeWASocket({
+      auth: state,
+      printQRInTerminal: false,
+      logger: {
+        level: 'silent',
+        log: () => {}
+      }
+    });
+
+    activeSessions.set(sessionId, socket);
+
+    socket.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+      
+      console.log(`Session ${sessionName} connection update:`, { connection, qr: !!qr });
+
+      if (qr) {
+        try {
+          const qrString = await QRCode.toDataURL(qr);
+          sessionQRCodes.set(sessionId, qrString);
+          
+          // Update database with QR code
+          await supabase
+            .from('whatsapp_sessions')
+            .update({ 
+              qr_code: qrString,
+              status: 'qr_ready'
+            })
+            .eq('id', sessionId);
+
+          // Emit QR code to clients
+          io.emit('qr', { session: sessionId, qr: qrString });
+          
+        } catch (qrError) {
+          console.error('QR Code generation error:', qrError);
+        }
+      }
+
+      if (connection === 'close') {
+        const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+        
+        if (shouldReconnect) {
+          console.log(`Session ${sessionName} reconnecting...`);
+          setTimeout(() => createWhatsAppSession(sessionId, sessionName), 3000);
+        } else {
+          console.log(`Session ${sessionName} logged out`);
+          activeSessions.delete(sessionId);
+          sessionQRCodes.delete(sessionId);
+          
+          await supabase
+            .from('whatsapp_sessions')
+            .update({ 
+              status: 'disconnected',
+              phone_number: null,
+              qr_code: null
+            })
+            .eq('id', sessionId);
+        }
+        
+        io.emit('wa:status', { session: sessionId, status: 'disconnected' });
+        
+      } else if (connection === 'open') {
+        console.log(`Session ${sessionName} connected successfully`);
+        const phoneNumber = socket.user?.id?.replace(/:\d+$/, '') || 'unknown';
+        
+        // Update database
+        await supabase
+          .from('whatsapp_sessions')
+          .update({ 
+            status: 'connected',
+            phone_number: phoneNumber,
+            qr_code: null
+          })
+          .eq('id', sessionId);
+
+        sessionQRCodes.delete(sessionId);
+        io.emit('wa:status', { session: sessionId, status: 'connected', phone: phoneNumber });
+      }
+    });
+
+    socket.ev.on('creds.update', saveCreds);
+
+    socket.ev.on('messages.upsert', async (messageUpdate) => {
+      const { messages } = messageUpdate;
+      
+      for (const message of messages) {
+        if (!message.key.fromMe && message.message) {
+          try {
+            const fromNumber = message.key.remoteJid;
+            const messageContent = message.message.conversation || 
+                                  message.message.extendedTextMessage?.text || 
+                                  'Media message';
+
+            // Store incoming message
+            await supabase
+              .from('whatsapp_messages')
+              .insert([{
+                session_id: sessionId,
+                from_number: fromNumber,
+                to_number: socket.user?.id || 'unknown',
+                message_content: messageContent,
+                message_type: 'text',
+                status: 'received',
+                direction: 'inbound',
+                whatsapp_message_id: message.key.id
+              }]);
+
+            // Emit to clients
+            io.emit('wa:message', {
+              session: sessionId,
+              from: fromNumber,
+              message: messageContent,
+              timestamp: message.messageTimestamp
+            });
+
+          } catch (error) {
+            console.error('Error processing incoming message:', error);
+          }
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error(`Error creating WhatsApp session ${sessionName}:`, error);
+    
+    await supabase
+      .from('whatsapp_sessions')
+      .update({ status: 'error' })
+      .eq('id', sessionId);
+      
+    throw error;
+  }
+}
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
-  
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
-  
-  // Handle custom events if needed
-  socket.on('request_qr', (data) => {
-    const { sessionId } = data;
+
+  socket.on('request_qr', (sessionId) => {
     const qrCode = sessionQRCodes.get(sessionId);
     if (qrCode) {
       socket.emit('qr', { session: sessionId, qr: qrCode });
     }
   });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
 });
 
 // Start server
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`🚀 WhatsApp Baileys server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔌 Socket.io ready for connections`);
-  
-  // Create sessions directory if it doesn't exist
-  const sessionsDir = path.join(__dirname, 'sessions');
-  if (!fs.existsSync(sessionsDir)) {
-    fs.mkdirSync(sessionsDir, { recursive: true });
-  }
+  console.log(`WhatsApp Baileys server running on port ${PORT}`);
+  console.log(`Socket.io server ready for connections`);
+  console.log(`CORS origin: ${process.env.CORS_ORIGIN || "http://localhost:5173"}`);
 });
-
-module.exports = { app, server, io };

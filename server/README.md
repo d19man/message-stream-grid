@@ -1,117 +1,46 @@
 # WhatsApp Baileys Server
 
-Server Express.js dengan Socket.io untuk WhatsApp integration menggunakan Baileys library.
-
-## Features
-
-- ✅ WhatsApp session management dengan Baileys
-- ✅ Real-time QR code via Socket.io  
-- ✅ Real-time status updates
-- ✅ Message sending/receiving
-- ✅ Session persistence
-- ✅ Authentication dengan Supabase
-- ✅ Auto-reconnection
+Express server dengan integrasi Baileys untuk WhatsApp dan Socket.io untuk real-time communication.
 
 ## Setup
 
-1. **Install dependencies:**
-   ```bash
-   cd server
-   npm install
-   ```
+1. Install dependencies:
+```bash
+npm install
+```
 
-2. **Environment variables:**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` file:
-   ```env
-   PORT=3001
-   SUPABASE_URL=https://fkviagopdmfytphpwtha.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
-   CORS_ORIGIN=http://localhost:5173
-   ```
+2. Copy environment file:
+```bash
+cp .env.example .env
+```
 
-3. **Run server:**
-   ```bash
-   # Development
-   npm run dev
-   
-   # Production  
-   npm start
-   ```
+3. Edit `.env` file dengan konfigurasi yang benar:
+```env
+SUPABASE_URL=https://fkviagopdmfytphpwtha.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+PORT=3001
+CORS_ORIGIN=http://localhost:5173
+NODE_ENV=development
+```
+
+4. Run server:
+```bash
+npm run dev
+```
 
 ## API Endpoints
 
-### Health Check
-- **GET** `/health` - Server status
-
-### WhatsApp Management (Auth required)
-- **POST** `/api/whatsapp/create` - Create session
-- **POST** `/api/whatsapp/connect` - Connect session (generates QR)
-- **POST** `/api/whatsapp/disconnect` - Disconnect session
-- **POST** `/api/whatsapp/send` - Send message
+- `GET /health` - Health check
+- `POST /api/whatsapp/create` - Create new session
+- `POST /api/whatsapp/connect` - Connect session  
+- `POST /api/whatsapp/disconnect` - Disconnect session
+- `POST /api/whatsapp/send` - Send message
 
 ## Socket.io Events
 
-### Client → Server
-- `request_qr` - Request QR code for session
-
-### Server → Client  
-- `qr` - QR code generated
-- `wa:status` - Session status update
-- `wa:message` - New incoming message
-
-## Usage Example
-
-### Frontend Socket.io Setup
-```javascript
-import { io } from 'socket.io-client';
-
-const socket = io('http://localhost:3001');
-
-// Listen for QR codes
-socket.on('qr', (data) => {
-  console.log('QR Code:', data.qr);
-  // data = { session: 'sessionId', qr: 'data:image/png;base64,...' }
-});
-
-// Listen for status updates
-socket.on('wa:status', (data) => {
-  console.log('Status:', data.status);
-  // data = { session: 'sessionId', status: 'connected|disconnected|qr_required' }
-});
-```
-
-### Create & Connect Session
-```javascript
-// 1. Create session
-const createResponse = await fetch('/api/whatsapp/create', {
-  method: 'POST',
-  headers: { 
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify({ 
-    sessionName: 'My Session',
-    sessionId: 'uuid-here'
-  })
-});
-
-// 2. Connect session (QR will come via Socket.io)
-const connectResponse = await fetch('/api/whatsapp/connect', {
-  method: 'POST', 
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify({ 
-    sessionId: 'uuid-here',
-    sessionName: 'My Session'
-  })
-});
-```
+- `qr` - QR code untuk pairing
+- `wa:status` - Status update session
+- `wa:message` - Incoming messages
 
 ## File Structure
 
@@ -119,15 +48,8 @@ const connectResponse = await fetch('/api/whatsapp/connect', {
 server/
 ├── server.js          # Main server file
 ├── package.json       # Dependencies
-├── .env.example      # Environment template
-├── sessions/         # WhatsApp auth sessions (auto-created)
+├── .env.example       # Environment template
+├── .gitignore        # Git ignore rules
+├── sessions/         # WhatsApp session data (auto-created)
 └── README.md         # This file
 ```
-
-## Notes
-
-- Session credentials disimpan di `sessions/` directory
-- QR codes dikirim real-time via Socket.io  
-- Auto-reconnection untuk sessions yang terputus
-- Authentication menggunakan Supabase JWT tokens
-- CORS dikonfigurasi untuk frontend development
