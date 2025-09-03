@@ -18,6 +18,7 @@ import Roles from "./pages/Roles";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import ChangePassword from "./pages/ChangePassword";
+import WhatsAppTest from "./pages/WhatsAppTest";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -99,6 +100,11 @@ const App = () => (
               <Route path="settings" element={
                 <ProtectedRoute requiredPermission="settings">
                   <Settings />
+                </ProtectedRoute>
+              } />
+              <Route path="whatsapp-test" element={
+                <ProtectedRoute>
+                  <WhatsAppTest />
                 </ProtectedRoute>
               } />
               <Route path="change-password" element={<ChangePassword />} />

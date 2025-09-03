@@ -41,12 +41,23 @@ if (!fs.existsSync(sessionsDir)) {
   fs.mkdirSync(sessionsDir, { recursive: true });
 }
 
-// Middleware to verify authentication (simplified for development)
+// Middleware to verify authentication 
 const verifyAuth = async (req, res, next) => {
   try {
-    // For development, we'll skip authentication but keep the structure
-    // In production, you should implement proper JWT verification
-    req.user = { id: 'development-user' };
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    // Verify token with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    req.user = user;
     next();
   } catch (error) {
     console.error('Auth error:', error);
@@ -158,18 +169,19 @@ app.post('/api/whatsapp/send', verifyAuth, async (req, res) => {
 
     const result = await socket.sendMessage(to, { text: message });
     
-    // Store message in database
-    await supabase
-      .from('whatsapp_messages')
-      .insert([{
-        session_id: sessionId,
-        from_number: socket.user?.id || 'unknown',
-        to_number: to,
-        message_content: message,
-        message_type: messageType,
-        status: 'sent',
-        direction: 'outbound'
-      }]);
+            // Store message in database
+            await supabase
+              .from('whatsapp_messages')
+              .insert([{
+                session_id: sessionId,
+                from_number: socket.user?.id || 'unknown',
+                to_number: to,
+                message_text: message,
+                message_type: messageType,
+                status: 'sent',
+                is_from_me: true,
+                timestamp: new Date().toISOString()
+              }]);
 
     res.json({ success: true, result });
   } catch (error) {
@@ -284,11 +296,12 @@ async function createWhatsAppSession(sessionId, sessionName) {
                 session_id: sessionId,
                 from_number: fromNumber,
                 to_number: socket.user?.id || 'unknown',
-                message_content: messageContent,
+                message_text: messageContent,
                 message_type: 'text',
-                status: 'received',
-                direction: 'inbound',
-                whatsapp_message_id: message.key.id
+                status: 'delivered',
+                is_from_me: false,
+                message_id: message.key.id,
+                timestamp: new Date(message.messageTimestamp * 1000).toISOString()
               }]);
 
             // Emit to clients
