@@ -44,6 +44,7 @@ import {
   HelpCircle,
   Bell,
   ExternalLink,
+  TestTube2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,6 +61,7 @@ const navigation = [
   { name: "Users", href: "/users", icon: Users2 },
   { name: "Roles", href: "/roles", icon: Shield },
   { name: "Settings", href: "/settings", icon: Settings },
+  { name: "WhatsApp Test", href: "/whatsapp-test", icon: TestTube2 },
 ];
 
 const Sidebar = () => {
@@ -98,15 +100,15 @@ const Sidebar = () => {
     const userRole = profile?.role;
     
     if (userRole === 'crm') {
-      return navigation.filter(item => ['/sessions', '/inbox', '/templates', '/contacts', '/settings'].includes(item.href));
+      return navigation.filter(item => ['/sessions', '/inbox', '/templates', '/contacts', '/settings', '/whatsapp-test'].includes(item.href));
     }
     
     if (userRole === 'blaster') {
-      return navigation.filter(item => ['/broadcast', '/settings'].includes(item.href));
+      return navigation.filter(item => ['/broadcast', '/settings', '/whatsapp-test'].includes(item.href));
     }
     
     if (userRole === 'warmup') {
-      return navigation.filter(item => ['/settings'].includes(item.href));
+      return navigation.filter(item => ['/settings', '/whatsapp-test'].includes(item.href));
     }
     
     // For superadmin and admin, use permission-based filtering
@@ -132,6 +134,8 @@ const Sidebar = () => {
           return canManageRoles();
         case "/settings":
           return canAccessSettings();
+        case "/whatsapp-test":
+          return true; // Allow all authenticated users to access WhatsApp test
         default:
           return false;
       }

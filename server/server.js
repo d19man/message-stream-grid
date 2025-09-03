@@ -227,7 +227,9 @@ async function createWhatsAppSession(sessionId, sessionName) {
             .eq('id', sessionId);
 
           // Emit QR code to clients
+          console.log('📤 Broadcasting QR code for session:', sessionId);
           io.emit('qr', { session: sessionId, qr: qrString });
+          io.to(`session_${sessionId}`).emit('qr', { session: sessionId, qr: qrString });
           
         } catch (qrError) {
           console.error('QR Code generation error:', qrError);
@@ -255,7 +257,9 @@ async function createWhatsAppSession(sessionId, sessionName) {
             .eq('id', sessionId);
         }
         
+        console.log('📤 Broadcasting disconnect status for session:', sessionId);
         io.emit('wa:status', { session: sessionId, status: 'disconnected' });
+        io.to(`session_${sessionId}`).emit('wa:status', { session: sessionId, status: 'disconnected' });
         
       } else if (connection === 'open') {
         console.log(`Session ${sessionName} connected successfully`);
@@ -272,7 +276,9 @@ async function createWhatsAppSession(sessionId, sessionName) {
           .eq('id', sessionId);
 
         sessionQRCodes.delete(sessionId);
+        console.log('📤 Broadcasting connected status for session:', sessionId, 'phone:', phoneNumber);
         io.emit('wa:status', { session: sessionId, status: 'connected', phone: phoneNumber });
+        io.to(`session_${sessionId}`).emit('wa:status', { session: sessionId, status: 'connected', phone: phoneNumber });
       }
     });
 
@@ -333,17 +339,35 @@ async function createWhatsAppSession(sessionId, sessionName) {
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  console.log('✅ Socket client connected:', socket.id);
 
   socket.on('request_qr', (sessionId) => {
+    console.log('📱 QR code requested for session:', sessionId);
     const qrCode = sessionQRCodes.get(sessionId);
     if (qrCode) {
+      console.log('📤 Sending existing QR code for session:', sessionId);
       socket.emit('qr', { session: sessionId, qr: qrCode });
+    } else {
+      console.log('❌ No QR code found for session:', sessionId);
     }
   });
 
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+  socket.on('join_session', (sessionId) => {
+    socket.join(`session_${sessionId}`);
+    console.log(`Socket ${socket.id} joined session room: session_${sessionId}`);
+  });
+
+  socket.on('leave_session', (sessionId) => {
+    socket.leave(`session_${sessionId}`);
+    console.log(`Socket ${socket.id} left session room: session_${sessionId}`);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('❌ Socket client disconnected:', socket.id, 'reason:', reason);
+  });
+
+  socket.on('error', (error) => {
+    console.error('🔥 Socket error:', error);
   });
 });
 
