@@ -37,7 +37,7 @@ const Settings = () => {
     openai: false,
   });
 
-  // Mock AI Agent Settings
+  // Real AI Agent Settings will come from backend
   const [aiSettings, setAiSettings] = useState<Record<PoolType, AIAgentSetting>>({
     CRM: {
       id: "ai-crm",
@@ -108,7 +108,7 @@ Keep responses natural, brief, and engaging.`,
     },
   });
 
-  // Mock Warming Policy
+  // Real Warming Policy will come from backend  
   const [warmingPolicy, setWarmingPolicy] = useState<WarmingPolicy>({
     id: "warming-policy",
     curve: [
@@ -128,7 +128,7 @@ Keep responses natural, brief, and engaging.`,
       image: 10,
     },
     maxPerHour: 15,
-    updatedAt: "2024-01-15T10:00:00Z",
+    updatedAt: new Date().toISOString(),
   });
 
   const handleAISettingChange = (pool: PoolType, field: string, value: any) => {

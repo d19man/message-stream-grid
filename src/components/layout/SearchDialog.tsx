@@ -37,62 +37,8 @@ export const SearchDialog = () => {
     setSelectedIndex(0);
   }, [query]);
 
-  // Mock search results
-  const allResults: SearchResult[] = [
-    {
-      id: "1",
-      type: "template",
-      title: "Welcome Message",
-      description: "Text template for new customers",
-      badge: "CRM",
-      action: "/templates"
-    },
-    {
-      id: "2",
-      type: "contact",
-      title: "John Doe",
-      description: "+1234567890 • Customer",
-      badge: "VIP",
-      action: "/contacts"
-    },
-    {
-      id: "3",
-      type: "session",
-      title: "CRM-Main",
-      description: "Connected • Last seen 2 min ago",
-      badge: "Connected",
-      action: "/sessions"
-    },
-    {
-      id: "4",
-      type: "campaign",
-      title: "Summer Sale Campaign",
-      description: "Running • 847 sent, 630 pending",
-      badge: "Running",
-      action: "/broadcast"
-    },
-    {
-      id: "5",
-      type: "page",
-      title: "Dashboard",
-      description: "Main dashboard with statistics",
-      action: "/"
-    },
-    {
-      id: "6",
-      type: "page",
-      title: "Users Management",
-      description: "Manage system users and roles",
-      action: "/users"
-    },
-    {
-      id: "7",
-      type: "page",
-      title: "Settings",
-      description: "Application settings and preferences",
-      action: "/settings"
-    },
-  ];
+  // Real search results will come from backend
+  const allResults: SearchResult[] = [];
 
   const filteredResults = query
     ? allResults.filter(result =>

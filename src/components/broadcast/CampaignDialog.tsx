@@ -88,21 +88,11 @@ export const CampaignDialog = ({ trigger, onSave, editingCampaign, onEditCancel 
 
   const availablePools = getAvailablePools();
 
-  // Mock data - in real app, these would come from API
-  const templates: Template[] = [
-    { id: "1", name: "Welcome Message", kind: "text", allowed_in: ["CRM", "WARMUP"], content_json: { text: "Hello {{name}}!" }, user_id: "1", created_at: "", updated_at: "" },
-    { id: "2", name: "Product Promo", kind: "image", allowed_in: ["BLASTER"], content_json: { mediaUrl: "", caption: "50% OFF!" }, user_id: "1", created_at: "", updated_at: "" },
-    { id: "3", name: "Survey Request", kind: "button", allowed_in: ["CRM", "BLASTER"], content_json: { text: "Please rate us", buttons: [] }, user_id: "1", created_at: "", updated_at: "" },
-  ];
+  // Real templates will come from backend
+  const templates: Template[] = [];
 
-  const contacts: Contact[] = [
-    { id: "1", name: "John Doe", phone: "+62812345001", system: "crm", tags: ["customer", "VIP"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "2", name: "Jane Smith", phone: "+62812345002", system: "crm", tags: ["No Deposit After Registration"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "3", name: "Mike Johnson", phone: "+62812345003", system: "blaster", tags: ["prospect", "No Recent Deposit"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "4", name: "Sarah Wilson", phone: "+62812345004", system: "blaster", tags: ["lead"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "5", name: "Tom Brown", phone: "+62812345005", system: "warmup", tags: ["test-contact"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-    { id: "6", name: "Lisa Davis", phone: "+62812345006", system: "crm", tags: ["No Recent Deposit", "customer"], optOut: false, userId: "1", createdAt: "", updatedAt: "" },
-  ];
+  const contacts: Contact[] = [];
+  // Real contacts will be loaded from backend
 
   const sessions: Session[] = [
     { id: "1", name: "CRM-Main", pool: "CRM", status: "connected", userId: "1", createdAt: "", updatedAt: "" },
