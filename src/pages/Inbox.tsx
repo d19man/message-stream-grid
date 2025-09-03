@@ -79,11 +79,11 @@ const Inbox = () => {
     try {
       setLoading(true);
       
-      // Get user's accessible sessions first
-      let sessionsQuery = supabase.from('sessions').select('*');
+      // Get user's accessible sessions from whatsapp_sessions (consistent with Baileys)
+      let sessionsQuery = supabase.from('whatsapp_sessions').select('*');
       
       if (profile.role === 'superadmin') {
-        // Superadmin can see all sessions
+        // Superadmin sees all sessions
       } else if (profile.role === 'admin') {
         sessionsQuery = sessionsQuery.or(`admin_id.eq.${user!.id},user_id.eq.${user!.id}`);
       } else {

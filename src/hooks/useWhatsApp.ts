@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { socketClient } from '@/lib/socket-client';
@@ -37,8 +37,11 @@ export const useWhatsApp = () => {
   const { toast } = useToast();
 
   // Fetch all sessions
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     try {
+      setLoading(true);
+      
+      // Use ONLY whatsapp_sessions table for consistency with Baileys backend
       const { data, error } = await supabase
         .from('whatsapp_sessions')
         .select('*')
@@ -48,7 +51,7 @@ export const useWhatsApp = () => {
       
       setSessions(data as WhatsAppSession[] || []);
     } catch (err: any) {
-      setError(err.message);
+      console.error('Error fetching WhatsApp sessions:', err);
       toast({
         title: "Error",
         description: "Failed to fetch WhatsApp sessions",
@@ -57,7 +60,7 @@ export const useWhatsApp = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   // Create new session directly in database
   const createSession = async (sessionName: string) => {
