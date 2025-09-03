@@ -378,13 +378,27 @@ serve(async (req) => {
         
         const qrCode = sessionData?.qr_code;
         
-        return new Response(JSON.stringify({
-          success: !!qrCode,
-          qrCode,
-          message: qrCode ? 'QR code retrieved' : 'No QR code available'
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        if (qrCode) {
+          // Convert Baileys QR text to image URL
+          const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCode)}`;
+          
+          return new Response(JSON.stringify({
+            success: true,
+            qrCode: qrImageUrl,
+            qrText: qrCode,
+            message: 'QR code retrieved'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } else {
+          return new Response(JSON.stringify({
+            success: false,
+            qrCode: null,
+            message: 'No QR code available'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
 
       if (action === 'status' && sessionId) {

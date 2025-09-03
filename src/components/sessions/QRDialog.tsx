@@ -15,6 +15,7 @@ export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => 
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
   const { toast } = useToast();
 
   const fetchQRCode = useCallback(async () => {
@@ -40,36 +41,49 @@ export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => 
 
       if (data?.success && data?.qrCode) {
         setQrCode(data.qrCode);
+        setPollCount(0); // Reset poll count on success
         toast({
           title: "QR Code Ready",
           description: "Scan the QR code with WhatsApp to connect",
         });
       } else {
-        toast({
-          title: "QR Code Not Available",
-          description: "Please try connecting the session first.",
-          variant: "destructive"
-        });
+        // If no QR code yet and we haven't polled too many times, try again
+        if (pollCount < 10) {
+          setTimeout(() => {
+            setPollCount(prev => prev + 1);
+            fetchQRCode();
+          }, 2000); // Poll every 2 seconds
+        } else {
+          toast({
+            title: "QR Code Not Available",
+            description: "Please try connecting the session again.",
+            variant: "destructive"
+          });
+        }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching QR code:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch QR code",
+        description: error instanceof Error ? error.message : "Failed to fetch QR code",
         variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
-  }, [sessionId, toast]);
+  }, [sessionId, toast, pollCount]);
 
   useEffect(() => {
     if (open && sessionId) {
+      setQrCode(null); // Reset QR code
+      setPollCount(0); // Reset poll count
       fetchQRCode();
     }
   }, [open, sessionId, fetchQRCode]);
 
   const refreshQR = () => {
+    setQrCode(null);
+    setPollCount(0);
     fetchQRCode();
   };
 

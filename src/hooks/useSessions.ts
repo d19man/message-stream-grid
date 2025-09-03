@@ -58,7 +58,12 @@ export const useSessions = () => {
 
   const createSession = async (sessionData: Partial<Session>): Promise<Session | null> => {
     try {
-      const sessionId = crypto.randomUUID();
+      // Generate UUID using a more compatible method
+      const sessionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
       
       // Create unique session name with timestamp to avoid duplicates
       const uniqueSessionName = `${sessionData.name || "Session"}_${Date.now()}`;
@@ -136,6 +141,8 @@ export const useSessions = () => {
   // Connect WhatsApp session 
   const connectWhatsApp = async (sessionId: string) => {
     try {
+      console.log('Connecting WhatsApp session:', sessionId);
+      
       const { data, error } = await supabase.functions.invoke('whatsapp-session', {
         body: {
           sessionId,
@@ -149,12 +156,13 @@ export const useSessions = () => {
         // Update local session status
         setSessions(prev => prev.map(s => s.id === sessionId ? { 
           ...s, 
-          status: "qr_required" as const
+          status: "connecting" as const,
+          last_seen: "Just now"
         } : s));
         
         toast({
-          title: "Connecting",
-          description: "QR code ready for scanning",
+          title: "Connection Started",
+          description: "WhatsApp connection initiated. QR code will be available shortly.",
         });
         return true;
       } else {
