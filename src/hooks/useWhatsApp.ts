@@ -8,7 +8,7 @@ interface WhatsAppSession {
   session_name: string;
   user_id: string;
   admin_id: string | null;
-  status: 'connecting' | 'connected' | 'disconnected' | 'qr_required' | 'pairing_required';
+  status: 'connecting' | 'connected' | 'disconnected' | 'qr_required' | 'pairing_required' | 'qr_ready' | 'error';
   qr_code: string | null;
   phone_number: string | null;
   last_seen: string;
@@ -100,23 +100,34 @@ export const useWhatsApp = () => {
   // Connect session via Express server
   const connectSession = async (sessionId: string) => {
     try {
-      // Update status to connecting in database
-      const { error } = await supabase
-        .from('whatsapp_sessions')
-        .update({ status: 'connecting' })
-        .eq('id', sessionId);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
-      if (error) throw new Error(error.message);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/whatsapp/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ sessionId })
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to connect session');
+      }
 
       toast({
         title: "Connecting",
-        description: "WhatsApp session is connecting via Express server...",
+        description: "WhatsApp session is connecting...",
       });
+      
       await fetchSessions();
       return true;
     } catch (err: any) {
       toast({
-        title: "Error",
+        title: "Error", 
         description: err.message,
         variant: "destructive",
       });
@@ -127,18 +138,29 @@ export const useWhatsApp = () => {
   // Disconnect session via Express server
   const disconnectSession = async (sessionId: string) => {
     try {
-      // Update status to disconnected in database
-      const { error } = await supabase
-        .from('whatsapp_sessions')
-        .update({ status: 'disconnected' })
-        .eq('id', sessionId);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
-      if (error) throw new Error(error.message);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/whatsapp/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ sessionId })
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to disconnect session');
+      }
 
       toast({
-        title: "Disconnected",
-        description: "WhatsApp session disconnected via Express server",
+        title: "Disconnected", 
+        description: "WhatsApp session disconnected",
       });
+      
       await fetchSessions();
       return true;
     } catch (err: any) {
@@ -171,25 +193,20 @@ export const useWhatsApp = () => {
   // Send message via Express server
   const sendMessage = async (sessionId: string, to: string, message: string, messageType: string = 'text') => {
     try {
-      // Get session name from database
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('whatsapp_sessions')
-        .select('session_name')
-        .eq('id', sessionId)
-        .single();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
-      if (sessionError) throw new Error(sessionError.message);
-
-      // Call Express server API
-      const response = await fetch(`http://localhost:3001/wa/${sessionData.session_name}/sendText`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/whatsapp/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          jid: to,
-          text: message
+          sessionId,
+          to,
+          message,
+          messageType
         })
       });
 
@@ -198,7 +215,7 @@ export const useWhatsApp = () => {
       if (response.ok) {
         toast({
           title: "Message Sent",
-          description: "WhatsApp message sent successfully via Express",
+          description: "WhatsApp message sent successfully",
         });
         return result;
       } else {
@@ -246,10 +263,10 @@ export const useWhatsApp = () => {
     // Listen for QR codes from Express server
     socketClient.onQRCode((data) => {
       console.log('QR code received:', data);
-      // Update sessions with QR code
+      // Update sessions with QR code using sessionId instead of session_name
       setSessions(prev => prev.map(s => {
-        if (s.session_name === data.session) {
-          return { ...s, qr_code: data.qr };
+        if (s.id === data.session) {
+          return { ...s, qr_code: data.qr, status: 'qr_ready' };
         }
         return s;
       }));
@@ -259,11 +276,12 @@ export const useWhatsApp = () => {
     socketClient.onStatusUpdate((data) => {
       console.log('Status update received:', data);
       setSessions(prev => prev.map(s => {
-        if (s.session_name === data.session) {
+        if (s.id === data.session) {
           return { 
             ...s, 
-            status: data.status as 'connecting' | 'connected' | 'disconnected' | 'qr_required' | 'pairing_required',
-            last_seen: new Date().toISOString()
+            status: data.status as WhatsAppSession['status'],
+            last_seen: new Date().toISOString(),
+            phone_number: (data as any).phone || s.phone_number
           };
         }
         return s;

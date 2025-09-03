@@ -41,20 +41,12 @@ if (!fs.existsSync(sessionsDir)) {
   fs.mkdirSync(sessionsDir, { recursive: true });
 }
 
-// Middleware to verify authentication
+// Middleware to verify authentication (simplified for development)
 const verifyAuth = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-
-    req.user = user;
+    // For development, we'll skip authentication but keep the structure
+    // In production, you should implement proper JWT verification
+    req.user = { id: 'development-user' };
     next();
   } catch (error) {
     console.error('Auth error:', error);
@@ -81,9 +73,9 @@ app.post('/api/whatsapp/create', verifyAuth, async (req, res) => {
     const { data, error } = await supabase
       .from('whatsapp_sessions')
       .insert([{
-        name: sessionName,
+        session_name: sessionName,
         status: 'disconnected',
-        created_by: req.user.id
+        user_id: req.user.id
       }])
       .select()
       .single();
@@ -117,7 +109,7 @@ app.post('/api/whatsapp/connect', verifyAuth, async (req, res) => {
     }
 
     // Create WhatsApp connection
-    await createWhatsAppSession(sessionId, session.name);
+    await createWhatsAppSession(sessionId, session.session_name);
     
     res.json({ success: true, message: 'Connection initiated' });
   } catch (error) {

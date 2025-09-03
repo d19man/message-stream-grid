@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { QrCode, RefreshCw, Loader2 } from "lucide-react";
@@ -7,7 +7,7 @@ import { socketClient } from "@/lib/socket-client";
 
 interface QRDialogProps {
   sessionName: string;
-  sessionId?: string;
+  sessionId: string;
   trigger?: React.ReactNode;
 }
 
@@ -15,85 +15,90 @@ export const QRDialog = ({ sessionName, sessionId, trigger }: QRDialogProps) => 
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [pollCount, setPollCount] = useState(0);
   const { toast } = useToast();
 
-  const fetchQRCode = useCallback(async () => {
-    if (!sessionId) return;
-    
-    try {
-      setLoading(true);
-      
-      // QR codes will come from Express server via Socket.io
-      // For now, show message to user
-      toast({
-        title: "Connecting to Express Server",
-        description: "QR code will be provided by Express server via Socket.io. Please wait...",
-      });
-      
-      // Simulate loading for now - real QR will come via Socket.io
-      setTimeout(() => {
-        setLoading(false);
-        toast({
-          title: "QR Code Not Available",
-          description: "QR codes are now handled by Express server. Please ensure your Express server is running.",
-          variant: "destructive"
-        });
-      }, 3000);
-      
-    } catch (error: unknown) {
-      console.error('Error:', error);
-      toast({
-        title: "Error",
-        description: "QR codes are now handled by Express server",
-        variant: "destructive"
-      });
-      setLoading(false);
-    }
-  }, [sessionId, toast]);
-
+  // Connect to socket and listen for QR codes when dialog opens
   useEffect(() => {
     if (open && sessionId) {
-      setQrCode(null); // Reset QR code
-      setPollCount(0); // Reset poll count
+      console.log('Setting up QR listener for session:', sessionId);
       
-      // Connect to Express server and listen for QR codes
       const socket = socketClient.connect();
       
-      // Listen for QR codes from Express server
-      socketClient.onQRCode((data) => {
-        console.log('QR code received from Express server:', data);
-        if (data.session === sessionName || data.session === sessionId) {
+      const handleQRCode = (data: { session: string; qr: string }) => {
+        console.log('QR code received in dialog:', data);
+        if (data.session === sessionId) {
           setQrCode(data.qr);
           setLoading(false);
           toast({
             title: "QR Code Ready",
-            description: "Scan the QR code with WhatsApp to connect",
+            description: "Scan the QR code with your WhatsApp app",
           });
         }
-      });
-      
-      fetchQRCode();
+      };
+
+      const handleStatusUpdate = (data: { session: string; status: string }) => {
+        console.log('Status update in QR dialog:', data);
+        if (data.session === sessionId && data.status === 'connected') {
+          setOpen(false);
+          setQrCode(null);
+          toast({
+            title: "Connected!",
+            description: "WhatsApp session connected successfully",
+          });
+        }
+      };
+
+      socketClient.onQRCode(handleQRCode);
+      socketClient.onStatusUpdate(handleStatusUpdate);
+
+      return () => {
+        socketClient.offQRCode(handleQRCode);
+        socketClient.offStatusUpdate(handleStatusUpdate);
+      };
     }
-    
-    return () => {
-      // Clean up socket listeners when dialog closes
-      socketClient.offQRCode();
-    };
-  }, [open, sessionId, sessionName, fetchQRCode, toast]);
+  }, [open, sessionId, toast]);
+
+  // Request QR code when dialog opens
+  useEffect(() => {
+    if (open && sessionId) {
+      setLoading(true);
+      setQrCode(null);
+      
+      // Request QR code from socket
+      const socket = socketClient.getSocket();
+      if (socket) {
+        socket.emit('request_qr', sessionId);
+      }
+      
+      // Set timeout to stop loading if no QR received
+      const timeout = setTimeout(() => {
+        setLoading(false);
+        if (!qrCode) {
+          toast({
+            title: "Timeout",
+            description: "QR code generation timed out. Try refreshing.",
+            variant: "destructive"
+          });
+        }
+      }, 30000); // 30 seconds timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [open, sessionId]);
 
   const refreshQR = () => {
-    setQrCode(null);
-    setPollCount(0);
     setLoading(true);
+    setQrCode(null);
     
-    // Request new QR from Express server
+    const socket = socketClient.getSocket();
+    if (socket) {
+      socket.emit('request_qr', sessionId);
+    }
+    
     toast({
       title: "Refreshing QR Code",
-      description: "Requesting new QR code from Express server...",
+      description: "Generating new QR code...",
     });
-    
-    fetchQRCode();
   };
 
   return (
