@@ -62,14 +62,7 @@ export const useSessions = () => {
       // Generate proper UUID using crypto.randomUUID
       const sessionId = crypto.randomUUID();
       
-      // Create unique session name with timestamp to avoid duplicates
-      const uniqueSessionName = `${sessionData.name || "Session"}_${Date.now()}`;
-      
-      // Create WhatsApp session using Express server - no direct creation needed
-      // Session will be created in the database, WhatsApp connection can be initiated later
-      console.log('Session will be created for:', uniqueSessionName);
-
-      // Create session in main sessions table (keep using Supabase for database)
+      // Create session in main sessions table
       const { data, error } = await supabase
         .from('sessions')
         .insert({
@@ -127,8 +120,29 @@ export const useSessions = () => {
     try {
       console.log('Connecting WhatsApp session:', sessionId);
       
-      // For now, use the Express server via Socket.io
-      // The connection will be handled by the Express server
+      // Get session data first
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) {
+        throw new Error('Session not found');
+      }
+      
+      // Call Express server API to connect
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/whatsapp/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          sessionName: session.name
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to connect to WhatsApp');
+      }
       
       // Update local session status immediately  
       setSessions(prev => prev.map(s => s.id === sessionId ? { 
@@ -139,7 +153,7 @@ export const useSessions = () => {
       
       toast({
         title: "Connection Started",
-        description: "WhatsApp connection initiated via Express server.",
+        description: "WhatsApp connection initiated successfully.",
       });
       return true;
     } catch (err: unknown) {
@@ -155,7 +169,29 @@ export const useSessions = () => {
   // Disconnect WhatsApp session via Express server
   const disconnectWhatsApp = async (sessionId: string) => {
     try {
-      // Disconnect will be handled by Express server
+      // Get session data first
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) {
+        throw new Error('Session not found');
+      }
+      
+      // Call Express server API to disconnect
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/whatsapp/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          sessionName: session.name
+        })
+      });
+      
+      if (!response.ok) {
+        console.warn('Failed to disconnect from server, updating local state anyway');
+      }
       
       // Update local session status
       setSessions(prev => prev.map(s => s.id === sessionId ? { 
@@ -167,7 +203,7 @@ export const useSessions = () => {
       
       toast({
         title: "Disconnected",
-        description: "WhatsApp session disconnected via Express server",
+        description: "WhatsApp session disconnected successfully",
       });
       return true;
     } catch (err: unknown) {
@@ -183,8 +219,7 @@ export const useSessions = () => {
   // Get QR Code from Express server directly
   const getQRCode = async (sessionId: string) => {
     try {
-      // For now, return null as QR will be handled by Express server real-time
-      // Express server will emit QR via Socket.io when available
+      // QR will be handled by Express server real-time via Socket.io
       console.log('QR Code will be provided by Express server via Socket.io for session:', sessionId);
       return null;
     } catch (err: unknown) {
@@ -210,7 +245,8 @@ export const useSessions = () => {
       if (sessionError) throw new Error(sessionError.message);
 
       // Call Express server API
-      const response = await fetch(`http://localhost:3001/wa/${sessionData.name}/sendText`, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/wa/${sessionData.name}/sendText`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

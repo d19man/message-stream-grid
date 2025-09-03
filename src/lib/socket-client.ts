@@ -6,7 +6,8 @@ class SocketClient {
   connect() {
     if (this.socket?.connected) return this.socket;
     
-    this.socket = io('http://localhost:3001', {
+    const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    this.socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       autoConnect: true
     });
