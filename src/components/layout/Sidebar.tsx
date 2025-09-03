@@ -144,8 +144,8 @@ const Sidebar = () => {
   const [profileData, setProfileData] = useState({
     name: profile?.full_name || "",
     email: profile?.email || "",
-    phone: "+1 234 567 8900", // This can remain as placeholder since it's not in auth
-    company: "WhatsApp Suite Ltd", // This can remain as placeholder
+    phone: "Not provided", // This field is not in the Profile type
+    company: "Not provided", // This field is not in the Profile type
   });
 
   // Update profile data when auth profile changes

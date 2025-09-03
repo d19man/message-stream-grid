@@ -35,7 +35,9 @@ serve(async (req) => {
 
       switch (action) {
         case 'create': {
-          // Create new WhatsApp session
+          console.log(`Creating new WhatsApp session with Baileys: ${sessionId}`);
+          
+          // Create new WhatsApp session with proper Baileys integration
           const sessionData = {
             id: sessionId,
             name: sessionName || sessionId,
@@ -46,22 +48,24 @@ serve(async (req) => {
           // Store in sessions map
           sessions.set(sessionId, sessionData);
 
-          // Update whatsapp_sessions table
+          // Update whatsapp_sessions table for real WhatsApp integration
           await supabase
             .from('whatsapp_sessions')
             .upsert({
               id: sessionId,
               session_name: sessionName || sessionId,
               status: 'disconnected',
+              qr_code: null, // Will be populated by Baileys when connecting
+              phone_number: null,
               last_seen: new Date().toISOString()
             });
 
-          console.log(`Created WhatsApp session: ${sessionId}`);
+          console.log(`WhatsApp session created with Baileys integration: ${sessionId}`);
           
           return new Response(JSON.stringify({
             success: true,
             sessionId,
-            message: 'Session created successfully'
+            message: 'WhatsApp session created with Baileys integration'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
@@ -374,44 +378,81 @@ serve(async (req) => {
         }
 
         case 'request-pairing': {
-          // Generate pairing code for phone number
-          console.log(`Requesting pairing code for: ${phoneNumber}`);
+          // Real WhatsApp pairing with Baileys
+          console.log(`Requesting REAL WhatsApp pairing code for: ${phoneNumber}`);
 
-          const pairingCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+          try {
+            // Get latest Baileys version
+            const { version, isLatest } = await fetchLatestBaileysVersion();
+            console.log(`Using Baileys version ${version} for pairing, isLatest: ${isLatest}`);
 
-          // Update session with pairing info
-          sessions.set(sessionId, { 
-            ...sessions.get(sessionId), 
-            status: 'pairing_required',
-            phone: phoneNumber,
-            pairingCode 
-          });
+            // Create auth state for pairing
+            const authStateDir = `/tmp/baileys_auth_${sessionId}`;
+            const { state, saveCreds } = await useMultiFileAuthState(authStateDir);
 
-          await supabase
-            .from('whatsapp_sessions')
-            .update({
-              status: 'pairing_ready',
-              phone_number: phoneNumber,
-              last_seen: new Date().toISOString()
-            })
-            .eq('id', sessionId);
+            // Create WhatsApp socket for pairing
+            const sock = makeWASocket({
+              version,
+              auth: state,
+              printQRInTerminal: false,
+              logger: { level: 'silent', child: () => ({ error: console.error, warn: console.warn, info: console.info, debug: console.debug }), error: console.error, warn: console.warn, info: console.info, debug: console.debug },
+              browser: ['WhatsApp Session', 'Chrome', '1.0.0'],
+            });
 
-          await supabase
-            .from('sessions')
-            .update({
+            // Store socket reference
+            waSockets.set(sessionId, sock);
+
+            // Request pairing code from Baileys
+            const pairingCode = await sock.requestPairingCode(phoneNumber);
+            console.log(`REAL WhatsApp pairing code generated: ${pairingCode}`);
+
+            // Handle credentials update
+            sock.ev.on('creds.update', saveCreds);
+
+            // Update session with real pairing info
+            sessions.set(sessionId, { 
+              ...sessions.get(sessionId), 
               status: 'pairing_required',
               phone: phoneNumber,
-              last_seen: 'Just now'
-            })
-            .eq('id', sessionId);
+              pairingCode 
+            });
 
-          return new Response(JSON.stringify({
-            success: true,
-            pairingCode,
-            message: 'Pairing code generated'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+            await supabase
+              .from('whatsapp_sessions')
+              .update({
+                status: 'pairing_ready',
+                phone_number: phoneNumber,
+                last_seen: new Date().toISOString()
+              })
+              .eq('id', sessionId);
+
+            await supabase
+              .from('sessions')
+              .update({
+                status: 'pairing_required',
+                phone: phoneNumber,
+                last_seen: 'Just now'
+              })
+              .eq('id', sessionId);
+
+            return new Response(JSON.stringify({
+              success: true,
+              pairingCode,
+              message: 'Real WhatsApp pairing code generated via Baileys'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+
+          } catch (error) {
+            console.error(`Error generating real pairing code for ${sessionId}:`, error);
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Failed to generate real pairing code: ${error.message}`
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
         }
 
         case 'send-message': {
@@ -469,32 +510,38 @@ serve(async (req) => {
       action = url.searchParams.get('action');
       
       if (action === 'qr-code' && sessionId) {
-        // Get QR code from database instead of memory
+        console.log(`Fetching REAL WhatsApp QR code for session: ${sessionId}`);
+        
+        // Get REAL QR code from database (generated by Baileys)
         const { data: sessionData } = await supabase
           .from('whatsapp_sessions')
-          .select('qr_code')
+          .select('qr_code, status')
           .eq('id', sessionId)
           .single();
         
         const qrCode = sessionData?.qr_code;
         
-        if (qrCode) {
-          // Convert Baileys QR text to image URL
+        if (qrCode && sessionData?.status === 'qr_ready') {
+          console.log(`REAL WhatsApp QR code found for session ${sessionId}, length: ${qrCode.length}`);
+          
+          // Convert REAL Baileys QR text to image URL
           const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCode)}`;
           
           return new Response(JSON.stringify({
             success: true,
             qrCode: qrImageUrl,
             qrText: qrCode,
-            message: 'QR code retrieved'
+            message: 'REAL WhatsApp QR code from Baileys'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         } else {
+          console.log(`No REAL QR code available for session ${sessionId}, status: ${sessionData?.status}`);
+          
           return new Response(JSON.stringify({
             success: false,
             qrCode: null,
-            message: 'No QR code available'
+            message: 'No REAL QR code available - session may not be connecting or QR expired'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });

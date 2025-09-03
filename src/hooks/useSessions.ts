@@ -58,12 +58,8 @@ export const useSessions = () => {
 
   const createSession = async (sessionData: Partial<Session>): Promise<Session | null> => {
     try {
-      // Generate UUID using a more compatible method
-      const sessionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
+      // Generate proper UUID using crypto.randomUUID
+      const sessionId = crypto.randomUUID();
       
       // Create unique session name with timestamp to avoid duplicates
       const uniqueSessionName = `${sessionData.name || "Session"}_${Date.now()}`;
