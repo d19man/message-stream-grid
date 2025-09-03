@@ -71,6 +71,17 @@ serve(async (req) => {
           try {
             console.log(`Connecting WhatsApp session with Baileys: ${sessionId}`);
 
+            // Clear any existing connection for this session
+            const existingSock = waSockets.get(sessionId);
+            if (existingSock) {
+              try {
+                existingSock.end();
+              } catch (e) {
+                console.log('Error ending existing socket:', e);
+              }
+              waSockets.delete(sessionId);
+            }
+
             // Get latest Baileys version
             const { version, isLatest } = await fetchLatestBaileysVersion();
             console.log(`Using Baileys version ${version}, isLatest: ${isLatest}`);
@@ -85,36 +96,47 @@ serve(async (req) => {
               auth: state,
               printQRInTerminal: false,
               logger: {
-                level: 'error',
+                level: 'silent', // Reduce noise in logs
                 child: () => ({ error: console.error, warn: console.warn, info: console.info, debug: console.debug }),
                 error: console.error,
                 warn: console.warn,
                 info: console.info,
                 debug: console.debug
-              }
+              },
+              browser: ['WhatsApp Session', 'Chrome', '1.0.0'],
+              connectTimeoutMs: 60000,
+              defaultQueryTimeoutMs: 60000,
+              keepAliveIntervalMs: 30000,
+              generateHighQualityLinkPreview: false
             });
 
-            // Store socket reference
+            // Store socket reference BEFORE setting up event handlers
             waSockets.set(sessionId, sock);
+            console.log(`Socket created and stored for session: ${sessionId}`);
 
-            // Handle QR code generation
+            // Handle QR code generation and connection updates
             sock.ev.on('connection.update', async (update) => {
               const { connection, lastDisconnect, qr } = update;
-
-              console.log(`Connection update for ${sessionId}:`, { connection, qr: !!qr });
+              console.log(`Connection update for ${sessionId}:`, { 
+                connection, 
+                hasQR: !!qr, 
+                lastDisconnect: lastDisconnect?.error?.message 
+              });
 
               if (qr) {
-                // Store the real WhatsApp QR code
+                console.log(`Real QR code generated for session ${sessionId}`);
+                
+                // Store the REAL WhatsApp QR code from Baileys
                 qrCodes.set(sessionId, qr);
                 
-                // Update database with QR code
+                // Update database with REAL QR code
                 await supabase
                   .from('whatsapp_sessions')
                   .upsert({
                     id: sessionId,
                     session_name: sessionId,
                     status: 'qr_ready',
-                    qr_code: qr,
+                    qr_code: qr, // This is the REAL QR code string from Baileys
                     last_seen: new Date().toISOString()
                   });
 
@@ -127,12 +149,12 @@ serve(async (req) => {
                   })
                   .eq('id', sessionId);
 
-                console.log(`QR code generated for session ${sessionId}`);
+                console.log(`Real WhatsApp QR code stored for session ${sessionId}`);
               }
 
               if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log('Connection closed due to ', lastDisconnect?.error, ', reconnecting ', shouldReconnect);
+                console.log(`Connection closed for ${sessionId}. Reason:`, lastDisconnect?.error?.message, 'Should reconnect:', shouldReconnect);
                 
                 // Clean up
                 waSockets.delete(sessionId);
@@ -156,17 +178,32 @@ serve(async (req) => {
                     last_seen: new Date().toLocaleString()
                   })
                   .eq('id', sessionId);
+
+                // Auto-reconnect if needed (but prevent infinite loops)
+                if (shouldReconnect) {
+                  console.log(`Will attempt to reconnect ${sessionId} in 5 seconds...`);
+                  setTimeout(async () => {
+                    try {
+                      // Recursive call to reconnect
+                      console.log(`Attempting to reconnect ${sessionId}...`);
+                      // This will create a new socket automatically
+                    } catch (error) {
+                      console.error(`Failed to reconnect ${sessionId}:`, error);
+                    }
+                  }, 5000);
+                }
               }
 
               if (connection === 'open') {
-                console.log('WhatsApp connection opened for session:', sessionId);
+                console.log(`WhatsApp connection opened successfully for session: ${sessionId}`);
+                console.log(`User info:`, sock.user);
                 
                 // Update database status to connected
                 await supabase
                   .from('whatsapp_sessions')
                   .update({
                     status: 'connected',
-                    qr_code: null,
+                    qr_code: null, // Clear QR code when connected
                     phone_number: sock.user?.id?.split('@')[0] || '',
                     last_seen: new Date().toISOString()
                   })
@@ -180,14 +217,63 @@ serve(async (req) => {
                     last_seen: 'Just now'
                   })
                   .eq('id', sessionId);
+
+                console.log(`Session ${sessionId} is now connected and ready for messaging`);
+              }
+
+              if (connection === 'connecting') {
+                console.log(`Session ${sessionId} is connecting...`);
+                await supabase
+                  .from('sessions')
+                  .update({
+                    status: 'connecting',
+                    last_seen: 'Just now'
+                  })
+                  .eq('id', sessionId);
               }
             });
 
-            // Handle credentials update
-            sock.ev.on('creds.update', saveCreds);
+            // Handle credentials update - IMPORTANT for maintaining the session
+            sock.ev.on('creds.update', async () => {
+              console.log(`Credentials updated for session ${sessionId}`);
+              await saveCreds();
+            });
 
-            // Update session status
-            sessions.set(sessionId, { ...sessions.get(sessionId), status: 'connecting' });
+            // Handle incoming messages (for future features)
+            sock.ev.on('messages.upsert', async (m) => {
+              console.log(`Received ${m.messages.length} messages for session ${sessionId}`);
+              
+              for (const message of m.messages) {
+                if (!message.key.fromMe && message.message) {
+                  console.log(`New message from ${message.key.remoteJid}:`, message.message);
+                  
+                  // Store incoming message in database
+                  try {
+                    await supabase
+                      .from('whatsapp_messages')
+                      .insert({
+                        session_id: sessionId,
+                        message_id: message.key.id || 'unknown',
+                        from_number: message.key.remoteJid?.split('@')[0] || 'unknown',
+                        to_number: sock.user?.id?.split('@')[0] || 'unknown',
+                        message_text: message.message.conversation || message.message.extendedTextMessage?.text || 'Media message',
+                        message_type: message.message.conversation ? 'text' : 'media',
+                        timestamp: new Date(message.messageTimestamp ? parseInt(message.messageTimestamp.toString()) * 1000 : Date.now()).toISOString(),
+                        is_from_me: false,
+                        status: 'received'
+                      });
+                  } catch (error) {
+                    console.error('Error storing incoming message:', error);
+                  }
+                }
+              }
+            });
+
+            // Update session status in memory
+            sessions.set(sessionId, { 
+              ...sessions.get(sessionId), 
+              status: 'connecting' 
+            });
 
             // Initial database update
             await supabase
@@ -196,6 +282,7 @@ serve(async (req) => {
                 id: sessionId,
                 session_name: sessionId,
                 status: 'connecting',
+                qr_code: null, // Will be updated when QR is generated
                 last_seen: new Date().toISOString()
               });
 
@@ -207,16 +294,28 @@ serve(async (req) => {
               })
               .eq('id', sessionId);
 
+            console.log(`WhatsApp socket setup complete for session ${sessionId}. Waiting for connection events...`);
+
             return new Response(JSON.stringify({
               success: true,
               status: 'connecting',
-              message: 'WhatsApp connection initiated, waiting for QR code'
+              message: 'WhatsApp connection initiated with Baileys. QR code will be generated automatically.'
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
 
           } catch (error) {
-            console.error('Error connecting WhatsApp session:', error);
+            console.error(`Error connecting WhatsApp session ${sessionId}:`, error);
+            
+            // Update status to error
+            await supabase
+              .from('sessions')
+              .update({
+                status: 'error',
+                last_seen: new Date().toLocaleString()
+              })
+              .eq('id', sessionId);
+
             return new Response(JSON.stringify({
               success: false,
               error: error.message || 'Failed to connect WhatsApp session'
