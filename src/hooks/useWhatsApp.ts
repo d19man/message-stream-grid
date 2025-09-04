@@ -106,7 +106,7 @@ export const useWhatsApp = () => {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/whatsapp/connect`, {
+      const response = await fetch(`http://localhost:3001/api/whatsapp/connect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,7 +144,7 @@ export const useWhatsApp = () => {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/whatsapp/disconnect`, {
+      const response = await fetch(`http://localhost:3001/api/whatsapp/disconnect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -199,7 +199,7 @@ export const useWhatsApp = () => {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/whatsapp/send`, {
+      const response = await fetch(`http://localhost:3001/api/whatsapp/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

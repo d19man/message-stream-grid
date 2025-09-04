@@ -6,7 +6,7 @@ class SocketClient {
   connect() {
     if (this.socket?.connected) return this.socket;
     
-    const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const SOCKET_URL = 'http://localhost:3001';
     console.log('Connecting to socket server:', SOCKET_URL);
     
     this.socket = io(SOCKET_URL, {

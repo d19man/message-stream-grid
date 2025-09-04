@@ -127,7 +127,7 @@ export const useSessions = () => {
       }
       
       // Call Express server API to connect
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const API_URL = 'http://localhost:3001';
       const response = await fetch(`${API_URL}/api/whatsapp/connect`, {
         method: 'POST',
         headers: {
@@ -176,7 +176,7 @@ export const useSessions = () => {
       }
       
       // Call Express server API to disconnect
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const API_URL = 'http://localhost:3001';
       const response = await fetch(`${API_URL}/api/whatsapp/disconnect`, {
         method: 'POST',
         headers: {
@@ -245,7 +245,7 @@ export const useSessions = () => {
       if (sessionError) throw new Error(sessionError.message);
 
       // Call Express server API
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const API_URL = 'http://localhost:3001';
       const response = await fetch(`${API_URL}/api/whatsapp/send`, {
         method: 'POST',
         headers: {
